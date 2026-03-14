@@ -1,0 +1,47 @@
+[
+  {
+    "notion_id": "311bece6-f7da-8191-a3d3-d50239294c43",
+    "nombre": "Sesión 11-feb-26",
+    "fecha": "2026-02-11",
+    "jugadores": [],
+    "resumen": ""
+  },
+  {
+    "notion_id": "311bece6-f7da-81d6-802c-d229ac638235",
+    "nombre": "Sesion 19-feb-26",
+    "fecha": "2026-02-19",
+    "jugadores": [],
+    "resumen": ""
+  },
+  {
+    "notion_id": "313bece6-f7da-809b-9c70-f75e996a55c1",
+    "nombre": "Sesion 25-feb-26",
+    "fecha": "2026-02-25",
+    "jugadores": [
+      { "notion_id": null, "nombre": "Caco" },
+      { "notion_id": null, "nombre": "Leo" },
+      { "notion_id": null, "nombre": "Enoch" },
+      { "notion_id": null, "nombre": "Hiram" }
+    ],
+    "resumen": ""
+  },
+  {
+    "notion_id": "319bece6-f7da-80d8-98f0-e28b29f76df2",
+    "nombre": "Sesion 04-mar-26",
+    "fecha": "2026-03-04",
+    "jugadores": [],
+    "resumen": ""
+  },
+  {
+    "notion_id": "321bece6-f7da-8023-bdae-f049e29c2065",
+    "nombre": "Sesión 11-mar-26",
+    "fecha": "2026-03-11",
+    "jugadores": [
+      { "notion_id": null, "nombre": "Caco" },
+      { "notion_id": null, "nombre": "Leo" },
+      { "notion_id": null, "nombre": "Enoch" },
+      { "notion_id": null, "nombre": "Hiram" }
+    ],
+    "resumen": ""
+  }
+]
