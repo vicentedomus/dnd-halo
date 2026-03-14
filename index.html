@@ -11,27 +11,64 @@
 </head>
 <body>
 
-<!-- ============================================================
-     LOGIN SCREEN
-     ============================================================ -->
+<!-- LOGIN SCREEN -->
 <div id="login-screen">
+
+  <!-- Stone wall texture overlay -->
+  <div class="stone-wall"></div>
+
+  <!-- Left pillar + torch -->
+  <div class="pillar pillar-left">
+    <div class="pillar-top"></div>
+    <div class="pillar-body"></div>
+    <div class="torch">
+      <div class="torch-glow"></div>
+      <div class="torch-flames">
+        <div class="flame f-base"></div>
+        <div class="flame f-mid"></div>
+        <div class="flame f-tip"></div>
+        <div class="flame f-core"></div>
+      </div>
+      <div class="torch-stick"></div>
+    </div>
+  </div>
+
+  <!-- Right pillar + torch -->
+  <div class="pillar pillar-right">
+    <div class="pillar-top"></div>
+    <div class="pillar-body"></div>
+    <div class="torch">
+      <div class="torch-glow"></div>
+      <div class="torch-flames">
+        <div class="flame f-base"></div>
+        <div class="flame f-mid"></div>
+        <div class="flame f-tip"></div>
+        <div class="flame f-core"></div>
+      </div>
+      <div class="torch-stick"></div>
+    </div>
+  </div>
+
+  <!-- Bottom archway -->
+  <div class="archway">
+    <div class="archway-inner"></div>
+  </div>
+
+  <!-- Login panel -->
   <div class="login-box">
-    <div class="login-logo">⚔ HALO</div>
+    <div class="login-logo">HALO</div>
     <div class="login-subtitle">Campaña de Dungeons &amp; Dragons</div>
     <div class="login-divider"></div>
     <form id="login-form" autocomplete="off">
-      <label for="password-input">Contraseña de acceso</label>
-      <input type="password" id="password-input" placeholder="Introduce tu contraseña..." autofocus>
-      <button type="submit" class="btn-login">&#9660; Entrar al reino &#9660;</button>
+      <input type="password" id="password-input" placeholder="Contraseña de acceso..." autofocus>
+      <button type="submit" class="btn-login">&#9660; Entrar al Reino &#9660;</button>
     </form>
     <div class="login-error" id="login-error"></div>
-    <div class="login-ornament">✦ ✦ ✦</div>
   </div>
+
 </div>
 
-<!-- ============================================================
-     APP
-     ============================================================ -->
+<!-- APP -->
 <div id="app">
 
   <!-- HEADER -->
@@ -69,7 +106,6 @@
   <!-- CONTENT -->
   <main id="content">
 
-    <!-- PERSONAJES -->
     <section id="section-personajes" class="section active">
       <div class="section-header">
         <h2 class="section-title">⚔ Personajes</h2>
@@ -80,7 +116,6 @@
       <div class="cards-grid" id="grid-personajes"></div>
     </section>
 
-    <!-- QUESTS -->
     <section id="section-quests" class="section">
       <div class="section-header">
         <h2 class="section-title">★ Quests</h2>
@@ -91,7 +126,6 @@
       <div class="cards-grid" id="grid-quests"></div>
     </section>
 
-    <!-- CIUDADES -->
     <section id="section-ciudades" class="section">
       <div class="section-header">
         <h2 class="section-title">🏙 Ciudades</h2>
@@ -103,7 +137,6 @@
       <div class="cards-grid" id="grid-ciudades"></div>
     </section>
 
-    <!-- ESTABLECIMIENTOS -->
     <section id="section-establecimientos" class="section">
       <div class="section-header">
         <h2 class="section-title">🏪 Establecimientos</h2>
@@ -115,7 +148,6 @@
       <div class="cards-grid" id="grid-establecimientos"></div>
     </section>
 
-    <!-- LUGARES -->
     <section id="section-lugares" class="section">
       <div class="section-header">
         <h2 class="section-title">🗺 Lugares</h2>
@@ -126,7 +158,6 @@
       <div class="cards-grid" id="grid-lugares"></div>
     </section>
 
-    <!-- NPCS -->
     <section id="section-npcs" class="section">
       <div class="section-header">
         <h2 class="section-title">👤 NPCs</h2>
@@ -138,7 +169,6 @@
       <div class="cards-grid" id="grid-npcs"></div>
     </section>
 
-    <!-- ITEMS -->
     <section id="section-items" class="section">
       <div class="section-header">
         <h2 class="section-title">⚔ Items Mágicos</h2>
@@ -150,7 +180,6 @@
       <div class="cards-grid" id="grid-items"></div>
     </section>
 
-    <!-- NOTAS -->
     <section id="section-notas" class="section">
       <div class="section-header">
         <h2 class="section-title">📓 Notas de Sesión</h2>
@@ -164,9 +193,7 @@
   </main>
 </div>
 
-<!-- ============================================================
-     MODAL
-     ============================================================ -->
+<!-- MODAL -->
 <div id="modal-overlay">
   <div class="modal">
     <div class="modal-header">
