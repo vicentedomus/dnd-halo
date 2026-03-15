@@ -91,6 +91,13 @@ async function loadData() {
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === `section-${tab}`));
+  const content = document.getElementById('content');
+  if (tab === 'mapa') {
+    content.classList.add('map-active');
+    renderMapa();
+  } else {
+    content.classList.remove('map-active');
+  }
 }
 
 // ── RENDER ALL ────────────────────────────────────────────────
@@ -1044,6 +1051,171 @@ async function saveModal() {
   } finally {
     spinner.classList.remove('open');
   }
+}
+
+// ── MAP ───────────────────────────────────────────────────────────
+let mapScale = 1, mapTX = 0, mapTY = 0;
+let mapDragging = false, mapLastX = 0, mapLastY = 0;
+let mapSvgEl = null;
+let mapLoaded = false;
+
+const MAP_LAYER_GROUPS = [
+  { label: 'Oc\u00e9ano',    ids: ['ocean','oceanLayers','oceanPattern'], on: true  },
+  { label: 'Tierra',     ids: ['landmass','coastline'],               on: true  },
+  { label: 'Agua',       ids: ['rivers','freshwater','lakes'],        on: true  },
+  { label: 'Relieve',    ids: ['terrain'],                            on: true  },
+  { label: 'Biomas',     ids: ['biomes'],                             on: false },
+  { label: 'Ciudades',   ids: ['burgIcons','burgLabels'],             on: true  },
+  { label: 'Reinos',     ids: ['statePaths','stateBorders','statesHalo','statesBody'], on: true },
+  { label: 'Culturas',   ids: ['regions'],                            on: false },
+  { label: 'Caminos',    ids: ['roads','routes','trails','searoutes'], on: true  },
+  { label: 'Etiquetas',  ids: ['labels','addedLabels'],               on: true  },
+  { label: 'Decoraci\u00f3n', ids: ['compass','scaleBar','vignette'], on: true  },
+  { label: 'Temp.',      ids: ['temperature'],                        on: false },
+  { label: 'Zonas',      ids: ['zones','markers'],                    on: false },
+];
+
+async function renderMapa() {
+  if (mapLoaded) return;
+  const viewport = document.getElementById('map-viewport');
+  if (!viewport) return;
+  try {
+    const res = await fetch('data/map.svg?t=' + Date.now());
+    const text = await res.text();
+    viewport.innerHTML = text;
+    mapSvgEl = viewport.querySelector('svg');
+    if (!mapSvgEl) return;
+    mapSvgEl.style.transformOrigin = '0 0';
+    mapSvgEl.setAttribute('width', '100%');
+    mapSvgEl.setAttribute('height', '100%');
+
+    renderMapLayerPanel();
+    initMapZoomPan(viewport);
+    initMapCityLinks();
+    mapLoaded = true;
+  } catch(e) {
+    viewport.innerHTML = `<div style="padding:40px;color:var(--text-dim);font-family:'Cinzel',serif;text-align:center">Error al cargar el mapa: ${e.message}</div>`;
+  }
+}
+
+function renderMapLayerPanel() {
+  const panel = document.getElementById('map-layer-panel');
+  if (!panel) return;
+  panel.innerHTML = `
+    <div class="map-panel-title">Capas</div>
+    ${MAP_LAYER_GROUPS.map((g, i) => `
+      <label class="map-layer-row">
+        <input type="checkbox" ${g.on ? 'checked' : ''} onchange="toggleMapLayer(${i}, this.checked)">
+        <span>${g.label}</span>
+      </label>
+    `).join('')}
+  `;
+  MAP_LAYER_GROUPS.forEach((g, i) => toggleMapLayer(i, g.on));
+}
+
+function toggleMapLayer(groupIdx, visible) {
+  const g = MAP_LAYER_GROUPS[groupIdx];
+  if (g) g.on = visible;
+  if (!mapSvgEl) return;
+  (g ? g.ids : []).forEach(id => {
+    const el = mapSvgEl.querySelector('#' + id);
+    if (el) el.style.display = visible ? '' : 'none';
+  });
+}
+
+function initMapZoomPan(viewport) {
+  // Zoom con rueda del mouse
+  viewport.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+    mapScale = Math.max(0.3, Math.min(12, mapScale * factor));
+    applyMapTransform();
+  }, { passive: false });
+
+  // Drag con mouse
+  viewport.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    mapDragging = true;
+    mapLastX = e.clientX;
+    mapLastY = e.clientY;
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!mapDragging) return;
+    mapTX += (e.clientX - mapLastX) / mapScale;
+    mapTY += (e.clientY - mapLastY) / mapScale;
+    mapLastX = e.clientX;
+    mapLastY = e.clientY;
+    applyMapTransform();
+  });
+  window.addEventListener('mouseup', () => { mapDragging = false; });
+
+  // Touch básico
+  let touchStartX = 0, touchStartY = 0;
+  viewport.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+  viewport.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    mapTX += (e.touches[0].clientX - touchStartX) / mapScale;
+    mapTY += (e.touches[0].clientY - touchStartY) / mapScale;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    applyMapTransform();
+  }, { passive: false });
+}
+
+function applyMapTransform() {
+  if (mapSvgEl) mapSvgEl.style.transform = `scale(${mapScale}) translate(${mapTX}px, ${mapTY}px)`;
+}
+
+function mapZoom(factor) {
+  mapScale = Math.max(0.3, Math.min(12, mapScale * factor));
+  applyMapTransform();
+}
+
+function mapZoomReset() {
+  mapScale = 1; mapTX = 0; mapTY = 0;
+  applyMapTransform();
+}
+
+function initMapCityLinks() {
+  const labelLayer = mapSvgEl.querySelector('#burgLabels');
+  const iconLayer  = mapSvgEl.querySelector('#burgIcons');
+  if (!labelLayer) return;
+
+  const todasCiudades = DATA.ciudades || [];
+  const ciudadesVisibles = isDM()
+    ? todasCiudades
+    : todasCiudades.filter(c => c.conocida_jugadores);
+
+  labelLayer.querySelectorAll('text').forEach(t => {
+    const name = t.textContent.trim();
+    const ciudad = ciudadesVisibles.find(c => c.nombre.toLowerCase() === name.toLowerCase());
+
+    if (!ciudad) {
+      // Jugadores: ocultar ciudades desconocidas
+      if (!isDM()) {
+        t.style.display = 'none';
+        const burgId = t.dataset.id;
+        if (burgId && iconLayer) {
+          const icon = iconLayer.querySelector(`[data-id="${burgId}"]`);
+          if (icon) icon.style.display = 'none';
+        }
+      }
+      return;
+    }
+
+    // Ciudad con ficha → clickeable
+    t.classList.add('map-city-link');
+    t.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openDetail('ciudades', ciudad);
+    });
+    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+    title.textContent = ciudad.nombre;
+    t.appendChild(title);
+  });
 }
 
 // ── RELOAD DATA ───────────────────────────────────────────────────
