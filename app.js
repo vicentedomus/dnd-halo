@@ -1062,12 +1062,33 @@ let mapLoaded = false;
 
 const MAP_LAYER_GROUPS = [
   { label: 'Biomas',      ids: ['biomes'],                  on: true  },
-  { label: 'Cuadr\u00edcula', ids: ['gridOverlay'],             on: true  },
+  { label: 'Cuadrícula', ids: ['gridOverlay'],              on: true  },
   { label: 'Ciudades',    ids: ['burgIcons', 'burgLabels'], on: true  },
   { label: 'Reinos',      ids: ['regions'],                 on: false },
   { label: 'Fronteras',   ids: ['borders'],                 on: false },
   { label: 'Culturas',    ids: ['cults'],                   on: false },
 ];
+
+function injectGridPattern(svgEl) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const defs = svgEl.querySelector('defs');
+  if (!defs || svgEl.querySelector('#pattern_pointyHex')) return;
+
+  const pattern = document.createElementNS(ns, 'pattern');
+  pattern.setAttribute('id', 'pattern_pointyHex');
+  pattern.setAttribute('width', '25');
+  pattern.setAttribute('height', '43.4');
+  pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  pattern.setAttribute('fill', 'none');
+  pattern.setAttribute('stroke', '#777777');
+  pattern.setAttribute('stroke-width', '0.5');
+  pattern.setAttribute('patternTransform', 'scale(0.28) translate(0 0)');
+
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', 'M 0,0 12.5,7.2 25,0 M 12.5,21.7 V 7.2 Z M 0,43.4 V 28.9 L 12.5,21.7 25,28.9 v 14.5');
+  pattern.appendChild(path);
+  defs.appendChild(pattern);
+}
 
 async function renderMapa() {
   if (mapLoaded) return;
@@ -1136,22 +1157,8 @@ async function renderMapa() {
       use.setAttribute('height', String(size));
     });
 
-    // --- Inyectar patrón hexagonal (~47 columnas, medido de referencia FMG) ---
-    if (defs && !mapSvgEl.querySelector('#pattern_pointyHex')) {
-      const s = 15.6, hx = 13.5, W = 27.01, H = 46.8;
-      const pattern = document.createElementNS(ns, 'pattern');
-      pattern.setAttribute('id', 'pattern_pointyHex');
-      pattern.setAttribute('width', String(W));
-      pattern.setAttribute('height', String(H));
-      pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-      const path = document.createElementNS(ns, 'path');
-      path.setAttribute('d', `m${hx},0 l${hx},${s} v${s} l-${hx},${s}`);
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke', '#777777');
-      path.setAttribute('stroke-width', '0.5');
-      pattern.appendChild(path);
-      defs.appendChild(pattern);
-    }
+    // --- Inyectar patrón hex del grid (FMG no lo exporta en el SVG) ---
+    injectGridPattern(mapSvgEl);
 
     renderMapLayerPanel();
     initMapZoomPan(viewport);
