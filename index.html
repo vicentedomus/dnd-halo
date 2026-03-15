@@ -99,6 +99,7 @@
           <button class="btn dm-only" onclick="openModal('establecimientos', null)">&#43; Añadir</button>
         </div>
       </div>
+      <div id="filter-bar-establecimientos"></div>
       <div class="cards-grid" id="grid-establecimientos"></div>
     </section>
 
@@ -131,6 +132,7 @@
           <button class="btn dm-only" onclick="openModal('items', null)">&#43; Añadir</button>
         </div>
       </div>
+      <div id="filter-bar-items"></div>
       <div class="cards-grid" id="grid-items"></div>
     </section>
 
@@ -174,6 +176,9 @@
   <div class="spinner"></div>
   <div class="spinner-text">Guardando...</div>
 </div>
+
+<!-- HOVER PREVIEW -->
+<div id="card-preview" style="display:none"></div>
 
 <script src="config.js"></script>
 <script src="auth.js"></script>

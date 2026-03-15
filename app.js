@@ -164,6 +164,58 @@ function estadoBadge(e) {
   return `<span class="badge ${e === 'Vivo' ? 'estado-vivo' : 'estado-muerto'}">${e}</span>`;
 }
 
+// ── RELATION CHIP (clickeable + hover preview) ───────────────────
+function relChip(tab, notionId, nombre, onCard = false) {
+  if (!nombre) return '—';
+  const safe = escapeHtml(nombre);
+  if (!notionId) return safe;
+  const cls = onCard ? 'rel-chip' : 'rel-link';
+  return `<span class="${cls}" onclick="event.stopPropagation();navegarA('${tab}','${notionId}')" onmouseenter="showPreview('${tab}','${notionId}',event)" onmouseleave="hidePreview()">${safe}</span>`;
+}
+
+function showPreview(tab, notionId, event) {
+  const arrMap = { npcs: DATA.npcs, ciudades: DATA.ciudades, establecimientos: DATA.establecimientos, personajes: DATA.players, items: DATA.items, quests: DATA.quests };
+  const arr = arrMap[tab] || [];
+  const rec = arr.find(x => x.notion_id === notionId);
+  if (!rec) return;
+
+  let html = `<div class="preview-title">${escapeHtml(rec.nombre)}</div>`;
+  if (tab === 'npcs') {
+    if (rec.rol)    html += `<div class="preview-row">${rolBadge(rec.rol)} ${estadoBadge(rec.estado)}</div>`;
+    if (rec.raza)   html += `<div class="preview-row"><span class="preview-label">Raza:</span>${escapeHtml(rec.raza)}</div>`;
+    if (rec.ciudad) html += `<div class="preview-row"><span class="preview-label">Ciudad:</span>${escapeHtml(rec.ciudad.nombre)}</div>`;
+  } else if (tab === 'ciudades') {
+    if (rec.estado)    html += `<div class="preview-row"><span class="preview-label">Reino:</span>${escapeHtml(rec.estado)}</div>`;
+    if (rec.lider)     html += `<div class="preview-row"><span class="preview-label">Líder:</span>${escapeHtml(rec.lider)}</div>`;
+    if (rec.poblacion) html += `<div class="preview-row"><span class="preview-label">Pob.:</span>${rec.poblacion.toLocaleString()}</div>`;
+  } else if (tab === 'establecimientos') {
+    if (rec.tipo)   html += `<div class="preview-row"><span class="badge tipo-badge">${escapeHtml(rec.tipo)}</span></div>`;
+    if (rec.ciudad) html += `<div class="preview-row"><span class="preview-label">Ciudad:</span>${escapeHtml(rec.ciudad.nombre)}</div>`;
+    if (rec.dueno)  html += `<div class="preview-row"><span class="preview-label">Dueño:</span>${escapeHtml(rec.dueno.nombre)}</div>`;
+  } else if (tab === 'personajes') {
+    if (rec.clase) html += `<div class="preview-row"><span class="preview-label">Clase:</span>${escapeHtml(rec.clase)}</div>`;
+    if (rec.raza)  html += `<div class="preview-row"><span class="preview-label">Raza:</span>${escapeHtml(rec.raza)}</div>`;
+  } else if (tab === 'items') {
+    if (rec.rareza) html += `<div class="preview-row">${rarezaBadge(rec.rareza)}</div>`;
+    if (rec.tipo)   html += `<div class="preview-row"><span class="badge tipo-badge">${escapeHtml(rec.tipo)}</span></div>`;
+  }
+  if (rec.descripcion) html += `<div class="preview-desc">${escapeHtml(rec.descripcion).substring(0,100)}${rec.descripcion.length > 100 ? '…' : ''}</div>`;
+
+  const el = document.getElementById('card-preview');
+  el.innerHTML = html;
+  el.style.display = 'block';
+  // Posicionar cerca del cursor, evitando salir de pantalla
+  const x = Math.min(event.clientX + 14, window.innerWidth - 290);
+  const y = Math.min(event.clientY + 14, window.innerHeight - el.offsetHeight - 10);
+  el.style.left = x + 'px';
+  el.style.top  = y + 'px';
+}
+
+function hidePreview() {
+  const el = document.getElementById('card-preview');
+  if (el) el.style.display = 'none';
+}
+
 // ── NAVIGATE TO CARD ─────────────────────────────────────────────
 function navegarA(tab, notionId) {
   closeModal();
@@ -222,20 +274,7 @@ function switchToEdit() {
   const schema = FORM_SCHEMAS[currentModalSection] || [];
   const data = currentModalData;
 
-  body.innerHTML = schema.map(field => {
-    const v = data[field.key] !== undefined ? data[field.key] : (field.type === 'checkbox' ? false : '');
-    if (field.type === 'textarea') {
-      return `<div class="form-group"><label>${field.label}</label><textarea id="field-${field.key}" rows="4">${escapeHtml(v || '')}</textarea></div>`;
-    }
-    if (field.type === 'checkbox') {
-      return `<div class="form-group"><div class="form-check"><input type="checkbox" id="field-${field.key}" ${v ? 'checked' : ''}><label for="field-${field.key}">${field.label}</label></div></div>`;
-    }
-    if (field.type === 'select') {
-      const opts = field.options.map(o => `<option value="${o}" ${o === v ? 'selected' : ''}>${o || '\u2014 Ninguno \u2014'}</option>`).join('');
-      return `<div class="form-group"><label>${field.label}</label><select id="field-${field.key}">${opts}</select></div>`;
-    }
-    return `<div class="form-group"><label>${field.label}${field.required ? ' *' : ''}</label><input type="${field.type || 'text'}" id="field-${field.key}" value="${escapeHtml(v !== null && v !== undefined ? String(v) : '')}"></div>`;
-  }).join('');
+  body.innerHTML = schema.map(field => formFieldHTML(field, data)).join('');
 
   const footer = document.getElementById('modal-footer');
   footer.innerHTML = `
@@ -253,13 +292,6 @@ function buildDetailHTML(section, data) {
     if (!text) return '';
     return `<div class="detail-section"><div class="detail-label">${label}</div><div class="detail-text">${escapeHtml(text).replace(/\n/g,'<br>')}</div></div>`;
   }
-  function relLink(tab, notionId, nombre) {
-    if (!nombre) return '\u2014';
-    const safe = escapeHtml(nombre);
-    if (notionId) return `<span class="rel-link" onclick="event.stopPropagation();navegarA('${tab}','${notionId}')">${safe}</span>`;
-    return safe;
-  }
-
   switch(section) {
     case 'npcs': {
       const n = data;
@@ -268,11 +300,11 @@ function buildDetailHTML(section, data) {
         row('Estado', estadoBadge(n.estado)),
         row('Tipo', n.tipo_npc ? `<span class="badge tipo-badge">${escapeHtml(n.tipo_npc)}</span>` : ''),
         row('Raza', escapeHtml(n.raza)),
-        row('Ciudad', n.ciudad ? relLink('ciudades', n.ciudad.notion_id, n.ciudad.nombre) : ''),
-        row('Establecimiento', n.establecimiento ? relLink('establecimientos', n.establecimiento.notion_id, n.establecimiento.nombre) : ''),
+        row('Ciudad', n.ciudad ? relChip('ciudades', n.ciudad.notion_id, n.ciudad.nombre) : ''),
+        row('Establecimiento', n.establecimiento ? relChip('establecimientos', n.establecimiento.notion_id, n.establecimiento.nombre) : ''),
         textBlock('Descripci\u00f3n', n.descripcion),
-        (isDM() && n.quests_relacionadas && n.quests_relacionadas.length) ? `<div class="detail-section"><div class="detail-label">Quests relacionadas</div><ul class="card-list">${n.quests_relacionadas.map(q => `<li>${relLink('quests', q.notion_id, q.nombre)}</li>`).join('')}</ul></div>` : '',
-        (isDM() && n.items_magicos && n.items_magicos.length) ? `<div class="detail-section"><div class="detail-label">Items M\u00e1gicos</div><ul class="card-list">${n.items_magicos.map(i => `<li>${relLink('items', i.notion_id, i.nombre)}</li>`).join('')}</ul></div>` : '',
+        (isDM() && n.quests_relacionadas && n.quests_relacionadas.length) ? `<div class="detail-section"><div class="detail-label">Quests relacionadas</div><ul class="card-list">${n.quests_relacionadas.map(q => `<li>${relChip('quests', q.notion_id, q.nombre)}</li>`).join('')}</ul></div>` : '',
+        (isDM() && n.items_magicos && n.items_magicos.length) ? `<div class="detail-section"><div class="detail-label">Items M\u00e1gicos</div><ul class="card-list">${n.items_magicos.map(i => `<li>${relChip('items', i.notion_id, i.nombre)}</li>`).join('')}</ul></div>` : '',
       ].join('');
     }
     case 'personajes': {
@@ -287,7 +319,7 @@ function buildDetailHTML(section, data) {
         (p.ac !== null && p.ac !== undefined) ? row('AC', p.ac) : '',
         (p.hp_maximo !== null && p.hp_maximo !== undefined) ? row('HP M\u00e1x', p.hp_maximo) : '',
         textBlock('Descripci\u00f3n', p.descripcion),
-        (p.items_magicos && p.items_magicos.length) ? `<div class="detail-section"><div class="detail-label">Items M\u00e1gicos</div><ul class="card-list">${p.items_magicos.map(i => `<li>${relLink('items', i.notion_id, i.nombre)}</li>`).join('')}</ul></div>` : '',
+        (p.items_magicos && p.items_magicos.length) ? `<div class="detail-section"><div class="detail-label">Items M\u00e1gicos</div><ul class="card-list">${p.items_magicos.map(i => `<li>${relChip('items', i.notion_id, i.nombre)}</li>`).join('')}</ul></div>` : '',
       ].join('');
     }
     case 'quests': {
@@ -300,20 +332,24 @@ function buildDetailHTML(section, data) {
     }
     case 'ciudades': {
       const c = data;
+      const cEstabs = (DATA.establecimientos || []).filter(e => e.ciudad && e.ciudad.notion_id === c.notion_id);
+      const cNpcs   = (DATA.npcs || []).filter(n => n.ciudad && n.ciudad.notion_id === c.notion_id);
       return [
         row('Reino/Estado', escapeHtml(c.estado)),
         row('L\u00edder', escapeHtml(c.lider)),
         c.poblacion ? row('Poblaci\u00f3n', c.poblacion.toLocaleString()) : '',
         textBlock('Descripci\u00f3n', c.descripcion),
         (isDM() && c.descripcion_lider) ? textBlock('Descripci\u00f3n L\u00edder (DM)', c.descripcion_lider) : '',
+        cEstabs.length ? `<div class="detail-section"><div class="detail-label">Establecimientos</div><ul class="card-list">${cEstabs.map(e => `<li>${relChip('establecimientos', e.notion_id, e.nombre)}</li>`).join('')}</ul></div>` : '',
+        cNpcs.length ? `<div class="detail-section"><div class="detail-label">NPCs</div><ul class="card-list">${cNpcs.map(n => `<li>${relChip('npcs', n.notion_id, n.nombre)}</li>`).join('')}</ul></div>` : '',
       ].join('');
     }
     case 'establecimientos': {
       const e = data;
       return [
         row('Tipo', e.tipo ? `<span class="badge tipo-badge">${escapeHtml(e.tipo)}</span>` : ''),
-        row('Ciudad', e.ciudad ? relLink('ciudades', e.ciudad.notion_id, e.ciudad.nombre) : ''),
-        row('Due\u00f1o', e.dueno ? relLink('npcs', e.dueno.notion_id, e.dueno.nombre) : ''),
+        row('Ciudad', e.ciudad ? relChip('ciudades', e.ciudad.notion_id, e.ciudad.nombre) : ''),
+        row('Due\u00f1o', e.dueno ? relChip('npcs', e.dueno.notion_id, e.dueno.nombre) : ''),
         textBlock('Descripci\u00f3n', e.descripcion),
       ].join('');
     }
@@ -332,7 +368,9 @@ function buildDetailHTML(section, data) {
         row('Rareza', rarezaBadge(it.rareza)),
         row('Tipo', it.tipo ? `<span class="badge tipo-badge">${escapeHtml(it.tipo)}</span>` : ''),
         row('Attunement', it.requiere_sintonizacion ? '\u2713 S\u00ed' : 'No'),
-        row('Portador', it.personaje ? relLink('personajes', it.personaje.notion_id, it.personaje.nombre) : '<span style="color:var(--text-dim)">Sin portador</span>'),
+        row('Portador', it.personaje ? relChip('personajes', it.personaje.notion_id, it.personaje.nombre) : '<span style="color:var(--text-dim)">Sin portador</span>'),
+        row('Fuente', escapeHtml(it.fuente)),
+        textBlock('Descripci\u00f3n', it.descripcion),
       ].join('');
     }
     case 'notas_dm': {
@@ -437,7 +475,10 @@ function renderCiudades() {
   items = filterBySearch(items, 'search-ciudades', ['nombre','estado','lider']);
   if (!items.length) { grid.innerHTML = emptyState('No hay ciudades.'); return; }
 
-  grid.innerHTML = items.map(c => `
+  grid.innerHTML = items.map(c => {
+    const cEstabs = (DATA.establecimientos || []).filter(e => e.ciudad && e.ciudad.notion_id === c.notion_id);
+    const cNpcs   = (DATA.npcs || []).filter(n => n.ciudad && n.ciudad.notion_id === c.notion_id);
+    return `
     <div class="card" data-section="ciudades" data-notion-id="${c.notion_id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
       <div class="card-header">
         <div>
@@ -451,17 +492,50 @@ function renderCiudades() {
           ${c.poblacion ? `<span class="meta-item"><span class="meta-label">Pob.:</span> ${c.poblacion.toLocaleString()}</span>` : ''}
         </div>
         ${c.descripcion ? `<div class="card-desc">${escapeHtml(c.descripcion)}</div>` : ''}
+        ${cEstabs.length ? `<div style="margin-top:8px"><div style="font-family:'Cinzel',serif;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.1em;margin-bottom:4px">ESTABLECIMIENTOS</div><div style="display:flex;flex-wrap:wrap;gap:4px">${cEstabs.map(e => relChip('establecimientos', e.notion_id, e.nombre, true)).join('')}</div></div>` : ''}
+        ${cNpcs.length ? `<div style="margin-top:8px"><div style="font-family:'Cinzel',serif;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.1em;margin-bottom:4px">NPCS</div><div style="display:flex;flex-wrap:wrap;gap:4px">${cNpcs.map(n => relChip('npcs', n.notion_id, n.nombre, true)).join('')}</div></div>` : ''}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // ── RENDER ESTABLECIMIENTOS ───────────────────────────────────────────
-function renderEstablecimientos() {
+function renderEstablecimientosFilters() {
+  const bar = document.getElementById('filter-bar-establecimientos');
+  if (!bar || bar.querySelector('.filter-select')) return;
+
+  let items = DATA.establecimientos || [];
+  if (!isDM()) items = items.filter(e => e.conocido_jugadores);
+
+  const tipos   = [...new Set(items.map(e => e.tipo).filter(Boolean))].sort();
+  const ciudades = [...new Set(items.map(e => e.ciudad && e.ciudad.nombre).filter(Boolean))].sort();
+
+  bar.innerHTML = `
+    <div class="filter-bar">
+      <select class="filter-select" id="filter-estab-tipo" onchange="renderEstablecimientosGrid()">
+        <option value="">Todos los tipos</option>
+        ${tipos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}
+      </select>
+      <select class="filter-select" id="filter-estab-ciudad" onchange="renderEstablecimientosGrid()">
+        <option value="">Todas las ciudades</option>
+        ${ciudades.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
+      </select>
+    </div>`;
+}
+
+function renderEstablecimientosGrid() {
   const grid = document.getElementById('grid-establecimientos');
   let items = DATA.establecimientos || [];
   if (!isDM()) items = items.filter(e => e.conocido_jugadores);
   items = filterBySearch(items, 'search-establecimientos', ['nombre','tipo']);
-  if (!items.length) { grid.innerHTML = emptyState('No hay establecimientos.'); return; }
+
+  const fTipo   = document.getElementById('filter-estab-tipo')   ? document.getElementById('filter-estab-tipo').value   : '';
+  const fCiudad = document.getElementById('filter-estab-ciudad') ? document.getElementById('filter-estab-ciudad').value : '';
+
+  if (fTipo)   items = items.filter(e => e.tipo === fTipo);
+  if (fCiudad) items = items.filter(e => e.ciudad && e.ciudad.nombre === fCiudad);
+
+  if (!items.length) { grid.innerHTML = emptyState('No hay establecimientos con esos filtros.'); return; }
 
   grid.innerHTML = items.map(e => `
     <div class="card" data-section="establecimientos" data-notion-id="${e.notion_id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
@@ -470,15 +544,20 @@ function renderEstablecimientos() {
           <div class="card-title">${escapeHtml(e.nombre)}</div>
           <div class="card-meta" style="margin-top:5px">
             <span class="badge tipo-badge">${val(e.tipo)}</span>
-            ${e.ciudad ? `<span style="font-size:0.75rem;color:var(--text-dim)">${escapeHtml(e.ciudad.nombre)}</span>` : ''}
+            ${e.ciudad ? relChip('ciudades', e.ciudad.notion_id, e.ciudad.nombre, true) : ''}
           </div>
         </div>
       </div>
       <div class="card-body">
-        ${e.dueno ? `<div class="card-meta"><span class="meta-item"><span class="meta-label">Due\u00f1o:</span> ${escapeHtml(e.dueno.nombre)}</span></div>` : ''}
+        ${e.dueno ? `<div class="card-meta"><span class="meta-item"><span class="meta-label">Due\u00f1o:</span> ${relChip('npcs', e.dueno.notion_id, e.dueno.nombre, true)}</span></div>` : ''}
         ${e.descripcion ? `<div class="card-desc">${escapeHtml(e.descripcion)}</div>` : ''}
       </div>
     </div>`).join('');
+}
+
+function renderEstablecimientos() {
+  renderEstablecimientosFilters();
+  renderEstablecimientosGrid();
 }
 
 // ── RENDER LUGARES ──────────────────────────────────────────────────
@@ -572,8 +651,8 @@ function renderNPCsGrid() {
       <div class="card-body">
         <div class="card-meta">
           ${n.raza ? `<span class="meta-item"><span class="meta-label">Raza:</span> ${escapeHtml(n.raza)}</span>` : ''}
-          ${n.ciudad ? `<span class="meta-item"><span class="meta-label">Ciudad:</span> ${escapeHtml(n.ciudad.nombre)}</span>` : ''}
-          ${n.establecimiento ? `<span class="meta-item"><span class="meta-label">Lugar:</span> ${escapeHtml(n.establecimiento.nombre)}</span>` : ''}
+          ${n.ciudad ? `<span class="meta-item"><span class="meta-label">Ciudad:</span> ${relChip('ciudades', n.ciudad.notion_id, n.ciudad.nombre, true)}</span>` : ''}
+          ${n.establecimiento ? `<span class="meta-item"><span class="meta-label">Lugar:</span> ${relChip('establecimientos', n.establecimiento.notion_id, n.establecimiento.nombre, true)}</span>` : ''}
         </div>
         ${n.descripcion ? `<div class="card-desc">${escapeHtml(n.descripcion).substring(0,120)}${n.descripcion.length > 120 ? '\u2026' : ''}</div>` : ''}
       </div>
@@ -586,11 +665,35 @@ function renderNPCs() {
 }
 
 // ── RENDER ITEMS ───────────────────────────────────────────────────────
-function renderItems() {
+function renderItemsFilters() {
+  const bar = document.getElementById('filter-bar-items');
+  if (!bar || bar.querySelector('.filter-select')) return;
+
+  let items = DATA.items || [];
+  if (!isDM()) items = items.filter(i => i.personaje !== null);
+
+  const personajes = [...new Set(items.filter(i => i.personaje).map(i => i.personaje.nombre))].sort();
+
+  bar.innerHTML = `
+    <div class="filter-bar">
+      <select class="filter-select" id="filter-item-personaje" onchange="renderItemsGrid()">
+        <option value="">Todos los portadores</option>
+        <option value="__ninguno__">Sin portador</option>
+        ${personajes.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
+      </select>
+    </div>`;
+}
+
+function renderItemsGrid() {
   const grid = document.getElementById('grid-items');
   let items = DATA.items || [];
   if (!isDM()) items = items.filter(i => i.personaje !== null);
   items = filterBySearch(items, 'search-items', ['nombre','tipo','rareza']);
+
+  const fPersonaje = document.getElementById('filter-item-personaje') ? document.getElementById('filter-item-personaje').value : '';
+  if (fPersonaje === '__ninguno__') items = items.filter(i => !i.personaje);
+  else if (fPersonaje) items = items.filter(i => i.personaje && i.personaje.nombre === fPersonaje);
+
   if (!items.length) { grid.innerHTML = emptyState('No hay items visibles.'); return; }
 
   grid.innerHTML = items.map(it => `
@@ -606,11 +709,16 @@ function renderItems() {
       </div>
       <div class="card-body">
         <div class="card-meta">
-          ${it.personaje ? `<span class="meta-item"><span class="meta-label">Portador:</span> ${escapeHtml(it.personaje.nombre)}</span>` : '<span class="meta-item" style="color:var(--text-dim)">Sin portador</span>'}
+          ${it.personaje ? `<span class="meta-item"><span class="meta-label">Portador:</span> ${relChip('personajes', it.personaje.notion_id, it.personaje.nombre, true)}</span>` : '<span class="meta-item" style="color:var(--text-dim)">Sin portador</span>'}
           ${it.requiere_sintonizacion ? `<span class="badge badge-rare" style="font-size:0.58rem">Attunement</span>` : ''}
         </div>
       </div>
     </div>`).join('');
+}
+
+function renderItems() {
+  renderItemsFilters();
+  renderItemsGrid();
 }
 
 // ── RENDER NOTAS ─────────────────────────────────────────────────────
@@ -756,8 +864,10 @@ const FORM_SCHEMAS = {
     { key:'conocida_jugadores', label:'Conocida por jugadores', type:'checkbox' },
   ],
   establecimientos: [
-    { key:'nombre', label:'Nombre', type:'text', required:true },
-    { key:'tipo',   label:'Tipo',   type:'text' },
+    { key:'nombre',  label:'Nombre', type:'text', required:true },
+    { key:'tipo',    label:'Tipo',   type:'select', options:['','Taberna','Librer\u00eda','Herrero','Templo','Tienda de Armas','Tienda Objetos M\u00e1gicos','Gremio','Gremio de Ladrones','Otro'] },
+    { key:'ciudad',  label:'Ciudad', type:'select-rel', source:'ciudades' },
+    { key:'dueno',   label:'Due\u00f1o', type:'select-rel', source:'npcs' },
     { key:'descripcion', label:'Descripci\u00f3n', type:'textarea' },
     { key:'conocido_jugadores', label:'Conocido por jugadores', type:'checkbox' },
   ],
@@ -765,23 +875,28 @@ const FORM_SCHEMAS = {
     { key:'nombre',  label:'Nombre', type:'text', required:true },
     { key:'tipo',    label:'Tipo',   type:'text' },
     { key:'region',  label:'Regi\u00f3n', type:'text' },
-    { key:'estado_exploracion', label:'Estado Exploraci\u00f3n', type:'text' },
+    { key:'estado_exploracion', label:'Estado Exploraci\u00f3n', type:'select', options:['','No explorado','Parcialmente explorado','Explorado'] },
     { key:'descripcion', label:'Descripci\u00f3n', type:'textarea' },
   ],
   npcs: [
-    { key:'nombre',   label:'Nombre', type:'text', required:true },
-    { key:'raza',     label:'Raza',   type:'text' },
-    { key:'tipo_npc', label:'Tipo NPC', type:'text' },
-    { key:'rol',      label:'Rol',    type:'select', options:['Neutral','Aliado','Enemigo'] },
-    { key:'estado',   label:'Estado', type:'select', options:['Vivo','Muerto'] },
-    { key:'descripcion', label:'Descripci\u00f3n', type:'textarea' },
+    { key:'nombre',         label:'Nombre',   type:'text', required:true },
+    { key:'raza',           label:'Raza',     type:'text' },
+    { key:'tipo_npc',       label:'Tipo NPC', type:'select', options:['','Comerciante','Gremio','Religioso','Otro'] },
+    { key:'rol',            label:'Rol',      type:'select', options:['Neutral','Aliado','Enemigo'] },
+    { key:'estado',         label:'Estado',   type:'select', options:['Vivo','Muerto'] },
+    { key:'ciudad',         label:'Ciudad',   type:'select-rel', source:'ciudades' },
+    { key:'establecimiento', label:'Establecimiento', type:'select-rel', source:'establecimientos' },
+    { key:'descripcion',    label:'Descripci\u00f3n', type:'textarea' },
     { key:'conocido_jugadores', label:'Conocido por jugadores', type:'checkbox' },
   ],
   items: [
     { key:'nombre',  label:'Nombre', type:'text', required:true },
-    { key:'tipo',    label:'Tipo',   type:'text' },
+    { key:'tipo',    label:'Tipo',   type:'select', options:['','Armor','Potion','Ring','Rod','Scroll','Staff','Wand','Weapon','Wondrous Item'] },
     { key:'rareza',  label:'Rareza', type:'select', options:['','Common','Uncommon','Rare','Very Rare','Legendary','Artifact'] },
+    { key:'personaje', label:'Portador', type:'select-rel', source:'players', filter: r => r.es_pj },
+    { key:'fuente',  label:'Fuente', type:'text' },
     { key:'requiere_sintonizacion', label:'Requiere Attunement', type:'checkbox' },
+    { key:'descripcion', label:'Descripci\u00f3n', type:'textarea' },
   ],
   notas_dm: [
     { key:'nombre',  label:'T\u00edtulo', type:'text', required:true },
@@ -789,9 +904,11 @@ const FORM_SCHEMAS = {
     { key:'resumen', label:'Resumen', type:'textarea' },
   ],
   notas_jugadores: [
-    { key:'nombre',  label:'T\u00edtulo', type:'text', required:true },
-    { key:'fecha',   label:'Fecha (YYYY-MM-DD)', type:'text' },
-    { key:'resumen', label:'Resumen', type:'textarea' },
+    { key:'nombre',   label:'T\u00edtulo', type:'text', required:true },
+    { key:'fecha',    label:'Fecha (YYYY-MM-DD)', type:'text' },
+    { key:'jugador',  label:'Jugador', type:'select', options:['','Pithor (Caco)','Lupin (Hiram)','Maverick (Enoch)','Doran (Leo)'] },
+    { key:'resumen',  label:'Resumen', type:'textarea' },
+    { key:'contenido', label:'Notas de sesi\u00f3n', type:'textarea' },
   ],
   notas: [
     { key:'nombre',  label:'T\u00edtulo', type:'text', required:true },
@@ -806,6 +923,32 @@ const SECTION_LABELS = {
   items:'Item', notas_dm:'Nota DM', notas_jugadores:'Nota Jugador', notas:'Nota'
 };
 
+// ── FORM FIELD RENDERER ───────────────────────────────────────────────
+function formFieldHTML(field, data) {
+  const v = data ? (data[field.key] !== undefined ? data[field.key] : '') : (field.type === 'checkbox' ? false : '');
+  if (field.type === 'textarea') {
+    return `<div class="form-group"><label>${field.label}</label><textarea id="field-${field.key}" rows="4">${escapeHtml(v || '')}</textarea></div>`;
+  }
+  if (field.type === 'checkbox') {
+    return `<div class="form-group"><div class="form-check"><input type="checkbox" id="field-${field.key}" ${v ? 'checked' : ''}><label for="field-${field.key}">${field.label}</label></div></div>`;
+  }
+  if (field.type === 'select') {
+    const opts = field.options.map(o => `<option value="${o}" ${o === v ? 'selected' : ''}>${o || '\u2014 Ninguno \u2014'}</option>`).join('');
+    return `<div class="form-group"><label>${field.label}</label><select id="field-${field.key}">${opts}</select></div>`;
+  }
+  if (field.type === 'select-rel') {
+    const srcArr = (DATA[field.source] || []).filter(field.filter || (() => true));
+    const current = data ? data[field.key] : null;
+    const currentId = current ? current.notion_id : '';
+    const opts = [
+      `<option value="">\u2014 Ninguno \u2014</option>`,
+      ...srcArr.map(r => `<option value="${r.notion_id}" ${r.notion_id === currentId ? 'selected' : ''}>${escapeHtml(r.nombre)}</option>`)
+    ].join('');
+    return `<div class="form-group"><label>${field.label}</label><select id="field-${field.key}">${opts}</select></div>`;
+  }
+  return `<div class="form-group"><label>${field.label}${field.required ? ' *' : ''}</label><input type="${field.type || 'text'}" id="field-${field.key}" value="${escapeHtml(v !== null && v !== undefined ? String(v) : '')}"></div>`;
+}
+
 function openModal(section, data) {
   currentModalSection = section;
   currentModalData = data || null;
@@ -817,20 +960,7 @@ function openModal(section, data) {
   const body = document.getElementById('modal-body');
   body.classList.remove('is-detail');
 
-  body.innerHTML = schema.map(field => {
-    const v = data ? (data[field.key] !== undefined ? data[field.key] : '') : (field.type === 'checkbox' ? false : '');
-    if (field.type === 'textarea') {
-      return `<div class="form-group"><label>${field.label}</label><textarea id="field-${field.key}" rows="4">${escapeHtml(v || '')}</textarea></div>`;
-    }
-    if (field.type === 'checkbox') {
-      return `<div class="form-group"><div class="form-check"><input type="checkbox" id="field-${field.key}" ${v ? 'checked' : ''}><label for="field-${field.key}">${field.label}</label></div></div>`;
-    }
-    if (field.type === 'select') {
-      const opts = field.options.map(o => `<option value="${o}" ${o === v ? 'selected' : ''}>${o || '\u2014 Ninguno \u2014'}</option>`).join('');
-      return `<div class="form-group"><label>${field.label}</label><select id="field-${field.key}">${opts}</select></div>`;
-    }
-    return `<div class="form-group"><label>${field.label}${field.required ? ' *' : ''}</label><input type="${field.type || 'text'}" id="field-${field.key}" value="${escapeHtml(v !== null && v !== undefined ? String(v) : '')}"></div>`;
-  }).join('');
+  body.innerHTML = schema.map(field => formFieldHTML(field, data)).join('');
 
   const footer = document.getElementById('modal-footer');
   footer.innerHTML = `
@@ -867,6 +997,15 @@ async function saveModal() {
       newData[field.key] = el.checked;
     } else if (field.type === 'number') {
       newData[field.key] = el.value === '' ? null : Number(el.value);
+    } else if (field.type === 'select-rel') {
+      const selectedId = el.value;
+      if (selectedId) {
+        const srcArr = (DATA[field.source] || []).filter(field.filter || (() => true));
+        const found = srcArr.find(r => r.notion_id === selectedId);
+        newData[field.key] = found ? { notion_id: found.notion_id, nombre: found.nombre } : null;
+      } else {
+        newData[field.key] = null;
+      }
     } else {
       newData[field.key] = el.value;
     }
