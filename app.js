@@ -45,33 +45,11 @@ async function bootApp() {
 
   await loadData();
   renderAll();
-
-  // Avisar al DM si no tiene token configurado
-  if (isDM() && !getGitHubToken()) {
-    const notice = document.getElementById('token-notice');
-    if (notice) notice.style.display = 'flex';
-  }
 }
 
 // ── GITHUB TOKEN ──────────────────────────────────────────
 function getGitHubToken() {
   return localStorage.getItem('gh_token') || '';
-}
-
-function configurarToken() {
-  const current = getGitHubToken();
-  const token = prompt(
-    'GitHub Personal Access Token\n\n' +
-    'Necesitas un token con permiso de escritura en el repo dnd-halo.\n' +
-    'C\u00f3mo crear uno: github.com/settings/tokens\n\n' +
-    (current ? '(Ya tienes uno configurado — pega uno nuevo para reemplazarlo)' : 'Pega tu token aqu\u00ed:')
-  );
-  if (token && token.trim()) {
-    localStorage.setItem('gh_token', token.trim());
-    const notice = document.getElementById('token-notice');
-    if (notice) notice.style.display = 'none';
-    alert('\u2713 Token guardado en este dispositivo.');
-  }
 }
 
 // ── DATA LOADING ──────────────────────────────────────────────
@@ -281,7 +259,7 @@ function openDetail(section, data) {
   const footer = document.getElementById('modal-footer');
   footer.innerHTML = `
     <button class="btn" onclick="closeModal()">Cerrar</button>
-    ${isDM() ? `<button class="btn btn-success" onclick="switchToEdit()">✎ Editar</button>` : ''}
+    ${(isDM() || data.creado_por_jugador) ? `<button class="btn btn-success" onclick="switchToEdit()">✎ Editar</button>` : ''}
   `;
 
   document.getElementById('modal-overlay').classList.add('open');
@@ -962,7 +940,11 @@ function formFieldHTML(field, data) {
     return `<div class="form-group"><label>${field.label}</label><select id="field-${field.key}">${opts}</select></div>`;
   }
   if (field.type === 'select-rel') {
-    const srcArr = (DATA[field.source] || []).filter(field.filter || (() => true));
+    let srcArr = (DATA[field.source] || []).filter(field.filter || (() => true));
+    // Jugadores solo ven entidades conocidas en los selectores
+    if (!isDM()) {
+      srcArr = srcArr.filter(r => r.conocida_jugadores || r.conocido_jugadores || r.creado_por_jugador);
+    }
     const current = data ? data[field.key] : null;
     const currentId = current ? current.notion_id : '';
     const opts = [
@@ -1007,8 +989,8 @@ function closeModal() {
 async function saveModal() {
   if (!currentModalSection) return;
 
-  if (!getGitHubToken()) {
-    configurarToken();
+  if (!(CONFIG.USE_NOTION && CONFIG.WORKER_URL) && !getGitHubToken()) {
+    alert('No hay conexión configurada para guardar datos.');
     return;
   }
 
@@ -1047,6 +1029,13 @@ async function saveModal() {
   const filename = FILE_MAP[tableKey] || `${tableKey}.json`;
   const action = (currentModalData && currentModalData.notion_id) ? 'edit' : 'add';
 
+  // Marcar registros creados por jugadores
+  if (action === 'add' && !isDM()) {
+    newData.creado_por_jugador = true;
+    newData.conocida_jugadores = true;
+    newData.conocido_jugadores = true;
+  }
+
   if (!DATA[dataKey]) DATA[dataKey] = [];
   const snapshot = [...DATA[dataKey]]; // backup para rollback
 
@@ -1060,12 +1049,32 @@ async function saveModal() {
   const spinner = document.getElementById('spinner');
   spinner.classList.add('open');
   try {
-    await saveToGitHub(filename, DATA[dataKey]);
+    if (CONFIG.USE_NOTION && CONFIG.WORKER_URL) {
+      if (action === 'add') {
+        const res = await fetch(`${CONFIG.WORKER_URL}/api/${dataKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newData),
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error || res.status); }
+        const created = await res.json();
+        newData.notion_id = created.notion_id;
+      } else {
+        const res = await fetch(`${CONFIG.WORKER_URL}/api/${dataKey}/${newData.notion_id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newData),
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error || res.status); }
+      }
+    } else {
+      await saveToGitHub(filename, DATA[dataKey]);
+    }
     closeModal();
     renderAll();
   } catch(e) {
     DATA[dataKey] = snapshot; // revertir cambio local
-    alert('Error al guardar en GitHub: ' + e.message);
+    alert('Error al guardar: ' + e.message);
   } finally {
     spinner.classList.remove('open');
   }
@@ -1251,19 +1260,61 @@ function initMapZoomPan(viewport) {
   });
   window.addEventListener('mouseup', () => { mapDragging = false; });
 
-  // Touch básico
-  let t0x = 0, t0y = 0;
+  // Touch: pan con 1 dedo, pinch-to-zoom con 2 dedos
+  let t0x = 0, t0y = 0, pinchDist0 = 0, isPinching = false;
+
+  function getTouchDist(t) {
+    const dx = t[1].clientX - t[0].clientX;
+    const dy = t[1].clientY - t[0].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
   viewport.addEventListener('touchstart', (e) => {
-    t0x = e.touches[0].clientX; t0y = e.touches[0].clientY;
+    if (e.touches.length === 2) {
+      isPinching = true;
+      pinchDist0 = getTouchDist(e.touches);
+      t0x = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      t0y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    } else {
+      isPinching = false;
+      t0x = e.touches[0].clientX;
+      t0y = e.touches[0].clientY;
+    }
   }, { passive: true });
+
   viewport.addEventListener('touchmove', (e) => {
     e.preventDefault();
     const rect = viewport.getBoundingClientRect();
-    vbX -= (e.touches[0].clientX - t0x) / rect.width  * vbW;
-    vbY -= (e.touches[0].clientY - t0y) / rect.height * vbH;
-    t0x = e.touches[0].clientX; t0y = e.touches[0].clientY;
+
+    if (e.touches.length === 2 && isPinching) {
+      // Pinch-to-zoom
+      const dist = getTouchDist(e.touches);
+      const factor = pinchDist0 / dist;
+      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const ratioX = (mx - rect.left) / rect.width;
+      const ratioY = (my - rect.top)  / rect.height;
+      const svgCX = vbX + ratioX * vbW;
+      const svgCY = vbY + ratioY * vbH;
+      vbW = Math.max(60, Math.min(VB_W0 * 3, vbW * factor));
+      vbH = vbW * (VB_H0 / VB_W0);
+      vbX = svgCX - ratioX * vbW;
+      vbY = svgCY - ratioY * vbH;
+      // También pan con el movimiento del centro
+      vbX -= (mx - t0x) / rect.width  * vbW;
+      vbY -= (my - t0y) / rect.height * vbH;
+      pinchDist0 = dist;
+      t0x = mx; t0y = my;
+    } else if (e.touches.length === 1 && !isPinching) {
+      // Pan con 1 dedo
+      vbX -= (e.touches[0].clientX - t0x) / rect.width  * vbW;
+      vbY -= (e.touches[0].clientY - t0y) / rect.height * vbH;
+      t0x = e.touches[0].clientX; t0y = e.touches[0].clientY;
+    }
     applyMapViewBox();
   }, { passive: false });
+
+  viewport.addEventListener('touchend', () => { isPinching = false; }, { passive: true });
 }
 
 function mapZoom(factor) {

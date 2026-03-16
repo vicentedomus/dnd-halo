@@ -103,6 +103,7 @@ async function transformCiudad(page, token) {
     lider: getText(p['lider']),
     poblacion: getNumber(p['poblacion']),
     conocida_jugadores: getCheckbox(p['Conocida por Jugadores?']),
+    creado_por_jugador: getCheckbox(p['Creado por Jugador?']),
   };
 }
 
@@ -123,6 +124,7 @@ async function transformNpc(page, token) {
     establecimiento: establecimiento || { notion_id: '', nombre: '' },
     descripcion: getText(p['Descripción']),
     conocido_jugadores: getCheckbox(p['Conocido por Jugadores']),
+    creado_por_jugador: getCheckbox(p['Creado por Jugador?']),
   };
 }
 
@@ -140,6 +142,7 @@ async function transformEstablecimiento(page, token) {
     dueno: dueno || { notion_id: '', nombre: '' },
     descripcion: getText(p['Descripcion']),
     conocido_jugadores: getCheckbox(p['Conocido por Jugadores?']),
+    creado_por_jugador: getCheckbox(p['Creado por Jugador?']),
   };
 }
 
@@ -239,6 +242,142 @@ const TRANSFORMERS = {
   lugares: transformLugar,
 };
 
+// --- Helpers de escritura (JSON → Notion properties) ---
+
+function toTitle(val) {
+  return { title: [{ text: { content: val || '' } }] };
+}
+function toRichText(val) {
+  return { rich_text: [{ text: { content: val || '' } }] };
+}
+function toSelect(val) {
+  return val ? { select: { name: val } } : { select: null };
+}
+function toNumber(val) {
+  return { number: val ?? null };
+}
+function toCheckbox(val) {
+  return { checkbox: !!val };
+}
+function toRelation(val) {
+  if (!val) return { relation: [] };
+  if (Array.isArray(val)) return { relation: val.filter(v => v?.notion_id).map(v => ({ id: v.notion_id })) };
+  return val.notion_id ? { relation: [{ id: val.notion_id }] } : { relation: [] };
+}
+
+// Transformadores inversos: JSON del frontend → properties de Notion
+const WRITE_MAP = {
+  ciudades: (d) => ({
+    'burg_nombre': toTitle(d.nombre),
+    'burg_id': toNumber(d.burg_id),
+    'descripcion_burg': toRichText(d.descripcion),
+    'descripcion_lider': toRichText(d.descripcion_lider),
+    'estado_burg': toRichText(d.estado),
+    'lider': toRichText(d.lider),
+    'poblacion': toNumber(d.poblacion),
+    'Conocida por Jugadores?': toCheckbox(d.conocida_jugadores),
+    'Creado por Jugador?': toCheckbox(d.creado_por_jugador),
+  }),
+  npcs: (d) => ({
+    'Name': toTitle(d.nombre),
+    'Raza': toSelect(d.raza),
+    'Tipo de NPC': toSelect(d.tipo_npc),
+    'Estado': toSelect(d.estado),
+    'Rol': toSelect(d.rol),
+    'Ciudad': toRelation(d.ciudad),
+    'Establecimiento': toRelation(d.establecimiento),
+    'Descripción': toRichText(d.descripcion),
+    'Conocido por Jugadores': toCheckbox(d.conocido_jugadores),
+    'Creado por Jugador?': toCheckbox(d.creado_por_jugador),
+  }),
+  establecimientos: (d) => ({
+    'Nombre Establecimiento ': toTitle(d.nombre),
+    'Tipo': toSelect(d.tipo),
+    'Ciudad': toRelation(d.ciudad),
+    'Dueño': toRelation(d.dueno),
+    'Descripcion': toRichText(d.descripcion),
+    'Conocido por Jugadores?': toCheckbox(d.conocido_jugadores),
+    'Creado por Jugador?': toCheckbox(d.creado_por_jugador),
+  }),
+  players: (d) => ({
+    'Name': toTitle(d.nombre),
+    'Clase': toSelect(d.clase),
+    'Subclase': toSelect(d.subclase),
+    'Raza': toSelect(d.raza),
+    'Tipo': toSelect(d.tipo),
+    'Es PJ': toCheckbox(d.es_pj),
+    'Jugador': toSelect(d.jugador),
+    'Nivel': toNumber(d.nivel),
+    'AC': toNumber(d.ac),
+    'HP Máximo': toNumber(d.hp_maximo),
+    'Descripción': toRichText(d.descripcion),
+    'Rol': toSelect(d.rol),
+    'Items Mágicos': toRelation(d.items_magicos),
+  }),
+  items: (d) => ({
+    'Name': toTitle(d.nombre),
+    'Tipo': toSelect(d.tipo),
+    'Rareza': toSelect(d.rareza),
+    'Personaje': toRelation(d.personaje),
+    'Requiere attunement?': toCheckbox(d.requiere_sintonizacion),
+    'Fuente': toRichText(d.fuente),
+    'Descripción': toRichText(d.descripcion),
+  }),
+  quests: (d) => ({
+    'Name': toTitle(d.nombre),
+    'Estado': toSelect(d.estado),
+    'Resumen': toRichText(d.resumen),
+    'Recompensa (GP)': toRichText(d.recompensa_gp),
+    'Visible por jugadores?': toCheckbox(d.visible_jugadores),
+    'NPCs importantes': toRichText(d.npcs_importantes),
+  }),
+  notas_dm: (d) => ({
+    'Name': toTitle(d.nombre),
+    'Resumen': toRichText(d.resumen),
+  }),
+  notas_jugadores: (d) => ({
+    'Name': toTitle(d.nombre),
+    'Resumen': toRichText(d.resumen),
+  }),
+  lugares: (d) => ({
+    'Name': toTitle(d.nombre),
+  }),
+};
+
+async function createPage(dbId, properties, token) {
+  const res = await fetch(`${NOTION_API}/pages`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Notion-Version': NOTION_VERSION,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ parent: { database_id: dbId }, properties }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Notion create error ${res.status}: ${err}`);
+  }
+  return res.json();
+}
+
+async function updatePage(pageId, properties, token) {
+  const res = await fetch(`${NOTION_API}/pages/${pageId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Notion-Version': NOTION_VERSION,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ properties }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Notion update error ${res.status}: ${err}`);
+  }
+  return res.json();
+}
+
 // --- Query Notion Database ---
 
 async function queryDatabase(dbId, token) {
@@ -282,7 +421,7 @@ export default {
     // CORS headers
     const corsHeaders = {
       'Access-Control-Allow-Origin': matchedOrigin,
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
       'Access-Control-Max-Age': '86400',
     };
@@ -292,17 +431,13 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    if (request.method !== 'GET') {
-      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-        status: 405,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const url = new URL(request.url);
-    const path = url.pathname.replace(/^\/api\//, '').replace(/\/$/, '');
+    // Parse: /api/npcs o /api/npcs/{id}
+    const pathParts = url.pathname.replace(/^\/api\//, '').replace(/\/$/, '').split('/');
+    const entity = pathParts[0];
+    const pageId = pathParts[1] || null;
 
-    if (!DB_MAP[path]) {
+    if (!DB_MAP[entity]) {
       return new Response(JSON.stringify({
         error: 'Not found',
         available: Object.keys(DB_MAP),
@@ -315,18 +450,47 @@ export default {
     try {
       const token = env.NOTION_TOKEN;
       if (!token) throw new Error('NOTION_TOKEN not configured');
+      const dbId = DB_MAP[entity];
 
-      const dbId = DB_MAP[path];
-      const pages = await queryDatabase(dbId, token);
-      const transformer = TRANSFORMERS[path];
-      const results = await Promise.all(pages.map(p => transformer(p, token)));
+      // GET: Listar todas las páginas
+      if (request.method === 'GET') {
+        const pages = await queryDatabase(dbId, token);
+        const transformer = TRANSFORMERS[entity];
+        const results = await Promise.all(pages.map(p => transformer(p, token)));
+        return new Response(JSON.stringify(results, null, 2), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=30' },
+        });
+      }
 
-      return new Response(JSON.stringify(results, null, 2), {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=30',
-        },
+      // POST: Crear nueva página
+      if (request.method === 'POST') {
+        const data = await request.json();
+        const writeMap = WRITE_MAP[entity];
+        if (!writeMap) throw new Error(`Write not supported for ${entity}`);
+        const properties = writeMap(data);
+        const page = await createPage(dbId, properties, token);
+        return new Response(JSON.stringify({ notion_id: page.id, success: true }), {
+          status: 201,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // PUT: Actualizar página existente
+      if (request.method === 'PUT') {
+        if (!pageId) throw new Error('PUT requires /{entity}/{notion_id}');
+        const data = await request.json();
+        const writeMap = WRITE_MAP[entity];
+        if (!writeMap) throw new Error(`Write not supported for ${entity}`);
+        const properties = writeMap(data);
+        await updatePage(pageId, properties, token);
+        return new Response(JSON.stringify({ notion_id: pageId, success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+        status: 405,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } catch (err) {
       return new Response(JSON.stringify({ error: err.message }), {

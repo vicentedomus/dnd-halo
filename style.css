@@ -587,7 +587,7 @@ body.bg-app {
   font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em;
   color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px;
 }
-.form-group input, .form-group textarea, .form-group select {
+.form-group input:not([type="checkbox"]), .form-group textarea, .form-group select {
   width: 100%; padding: 8px 12px;
   background: rgba(0,0,0,0.45);
   border: 1px solid var(--border-gold-dark); border-bottom: 2px solid var(--border-gold-dark);

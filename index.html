@@ -37,21 +37,14 @@
   <header id="header">
     <div class="header-logo">⚔ HALO</div>
     <div class="header-actions">
-      <button class="btn dm-only btn-sm" onclick="recargarDatos()" title="Recargar datos desde GitHub">
+      <button class="btn dm-only btn-sm" onclick="recargarDatos()" title="Recargar datos">
         <span>&#8635;</span> <span>Recargar</span>
       </button>
-      <button class="btn dm-only btn-sm btn-icon" onclick="configurarToken()" title="Configurar token GitHub">⚙</button>
       <button class="btn btn-danger" onclick="logout()">
         <span>&#10005;</span> <span>Salir</span>
       </button>
     </div>
   </header>
-
-  <!-- TOKEN NOTICE (visible solo si DM no tiene token) -->
-  <div id="token-notice" style="display:none; align-items:center; gap:12px; padding:8px 20px; background:rgba(204,119,0,0.12); border-bottom:1px solid #7a4d00; font-family:'Cinzel',serif; font-size:0.7rem; color:#ffcc44; letter-spacing:0.05em;">
-    <span>&#9888; Token de GitHub no configurado — no podrás guardar cambios.</span>
-    <button class="btn btn-sm" onclick="configurarToken()">Configurar</button>
-  </div>
 
   <!-- TAB BAR -->
   <nav id="tab-bar">
@@ -73,7 +66,7 @@
       <div class="section-header">
         <h2 class="section-title">📓 Notas de Sesión</h2>
         <div class="section-controls">
-          <button class="btn dm-only" onclick="openModal('notas', null)">&#43; Añadir</button>
+          <button class="btn" onclick="openModal('notas', null)">&#43; Añadir</button>
         </div>
       </div>
       <div id="filter-bar-notas"></div>
@@ -85,7 +78,7 @@
         <h2 class="section-title">👤 NPCs</h2>
         <div class="section-controls">
           <input type="text" class="search-input" id="search-npcs" placeholder="Buscar NPC..." oninput="renderNPCs()">
-          <button class="btn dm-only" onclick="openModal('npcs', null)">&#43; Añadir</button>
+          <button class="btn" onclick="openModal('npcs', null)">&#43; Añadir</button>
         </div>
       </div>
       <div id="filter-bar-npcs"></div>
@@ -97,7 +90,7 @@
         <h2 class="section-title">🏪 Establecimientos</h2>
         <div class="section-controls">
           <input type="text" class="search-input" id="search-establecimientos" placeholder="Buscar..." oninput="renderEstablecimientos()">
-          <button class="btn dm-only" onclick="openModal('establecimientos', null)">&#43; Añadir</button>
+          <button class="btn" onclick="openModal('establecimientos', null)">&#43; Añadir</button>
         </div>
       </div>
       <div id="filter-bar-establecimientos"></div>
@@ -109,7 +102,7 @@
         <h2 class="section-title">🏙 Ciudades</h2>
         <div class="section-controls">
           <input type="text" class="search-input" id="search-ciudades" placeholder="Buscar ciudad..." oninput="renderCiudades()">
-          <button class="btn dm-only" onclick="openModal('ciudades', null)">&#43; Añadir</button>
+          <button class="btn" onclick="openModal('ciudades', null)">&#43; Añadir</button>
         </div>
       </div>
       <div class="cards-grid" id="grid-ciudades"></div>
