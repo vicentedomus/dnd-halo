@@ -77,6 +77,23 @@ function configurarToken() {
 // ── DATA LOADING ──────────────────────────────────────────────
 async function loadData() {
   const files = ['players','quests','ciudades','establecimientos','lugares','npcs','items','notas_dm','notas_jugadores'];
+  const useNotion = CONFIG.USE_NOTION && CONFIG.WORKER_URL;
+
+  if (useNotion) {
+    try {
+      await Promise.all(files.map(async (f) => {
+        const res = await fetch(`${CONFIG.WORKER_URL}/api/${f}`);
+        if (!res.ok) throw new Error(`Worker ${f}: ${res.status}`);
+        DATA[f] = await res.json();
+      }));
+      console.log('✓ Datos cargados desde Notion');
+      return;
+    } catch(e) {
+      console.warn('⚠ Notion falló, usando JSON locales:', e.message);
+    }
+  }
+
+  // Fallback: JSON locales
   await Promise.all(files.map(async (f) => {
     try {
       const res = await fetch(`data/${f}.json?t=${Date.now()}`);
@@ -85,6 +102,7 @@ async function loadData() {
       DATA[f] = [];
     }
   }));
+  console.log('✓ Datos cargados desde JSON locales');
 }
 
 // ── TAB SWITCHING ───────────────────────────────────────────────
