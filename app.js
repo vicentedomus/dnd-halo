@@ -108,6 +108,7 @@ function switchTab(tab) {
   } else {
     content.classList.remove('map-active');
   }
+  if (tab === 'utilidades') renderUtilidades();
 }
 
 // ── RENDER ALL ────────────────────────────────────────────────
@@ -1049,14 +1050,16 @@ const FORM_SCHEMAS = {
   notas_dm: [
     { key:'nombre',  label:'T\u00edtulo', type:'text', required:true },
     { key:'fecha',   label:'Fecha (YYYY-MM-DD)', type:'text' },
+    { key:'jugadores_presentes', label:'Jugadores presentes', type:'select', options:['','Tino','Caco','Leo','Enoch','Hiram'] },
+    { key:'quests', label:'Quests relacionadas', type:'select-rel-multi', source:'quests' },
     { key:'resumen', label:'Resumen', type:'textarea' },
   ],
   notas_jugadores: [
     { key:'nombre',   label:'T\u00edtulo', type:'text', required:true },
     { key:'fecha',    label:'Fecha (YYYY-MM-DD)', type:'text' },
-    { key:'jugador',  label:'Jugador', type:'select', options:['','Pithor (Caco)','Lupin (Hiram)','Maverick (Enoch)','Doran (Leo)'] },
+    { key:'jugador',  label:'Jugador', type:'select', options:['','Tino','Caco','Leo','Enoch','Hiram'] },
+    { key:'items', label:'Items relacionados', type:'select-rel-multi', source:'items' },
     { key:'resumen',  label:'Resumen', type:'textarea' },
-    { key:'contenido', label:'Notas de sesi\u00f3n', type:'textarea' },
   ],
   notas: [
     { key:'nombre',  label:'T\u00edtulo', type:'text', required:true },
@@ -1997,6 +2000,101 @@ function renderMapMarkers() {
 
     g.appendChild(pin);
   }
+}
+
+// ── UTILIDADES ────────────────────────────────────────────────────
+
+const UTIL_CARDS = [
+  { id: 'shop-gen', title: 'Generador de Inventario', desc: 'Genera inventario aleatorio de tiendas mágicas según ciudad y tipo de establecimiento.', icon: '&#9876;' },
+];
+
+function renderUtilidades() {
+  const grid = document.getElementById('grid-utilidades');
+  if (!grid) return;
+  grid.innerHTML = UTIL_CARDS.map(u => `
+    <div class="card util-card" onclick="openUtilidad('${u.id}')" style="cursor:pointer">
+      <div class="card-header">
+        <div>
+          <div class="card-title"><span style="margin-right:6px">${u.icon}</span>${u.title}</div>
+        </div>
+      </div>
+      <div class="card-body"><div class="card-desc">${u.desc}</div></div>
+    </div>
+  `).join('');
+}
+
+function openUtilidad(id) {
+  if (id === 'shop-gen') openShopGenerator();
+}
+
+function openShopGenerator() {
+  const ws = document.getElementById('util-workspace');
+  ws.style.display = '';
+  ws.innerHTML = `
+    <div class="util-panel">
+      <div class="util-panel-header">
+        <h3 class="util-title">&#9876; Generador de Inventario</h3>
+        <button class="btn btn-sm" onclick="closeUtilWorkspace()">&#10005; Cerrar</button>
+      </div>
+      <div class="util-controls">
+        <div class="util-field">
+          <label>Ciudad</label>
+          <select id="util-burg" onchange="onUtilBurgChange()">
+            <option value="">— Selecciona ciudad —</option>
+          </select>
+        </div>
+        <div class="util-field">
+          <label>Tipo de Tienda</label>
+          <select id="util-tienda"><option value="">— Selecciona tienda —</option></select>
+        </div>
+        <button class="btn btn-success" onclick="generarInventario()">Generar</button>
+      </div>
+      <div id="util-info"></div>
+      <div id="util-resultado"></div>
+    </div>
+  `;
+  // Poblar burgs
+  const sel = document.getElementById('util-burg');
+  getBurgs().forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; sel.appendChild(o); });
+  // Scroll al workspace
+  ws.scrollIntoView({ behavior: 'smooth' });
+}
+
+function closeUtilWorkspace() {
+  const ws = document.getElementById('util-workspace');
+  ws.style.display = 'none';
+  ws.innerHTML = '';
+}
+
+function onUtilBurgChange() {
+  const burgName = document.getElementById('util-burg').value;
+  const tiendaSel = document.getElementById('util-tienda');
+  tiendaSel.innerHTML = '<option value="">— Selecciona tienda —</option>';
+  document.getElementById('util-resultado').innerHTML = '';
+  document.getElementById('util-info').innerHTML = '';
+  if (!burgName) return;
+  getTiendasDeBurg(burgName).forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; tiendaSel.appendChild(o); });
+  const cat = getCategoriaBurg(burgName);
+  if (cat) document.getElementById('util-info').innerHTML = `<div class="util-info-bar"><span class="badge tipo-badge">${burgName}</span> <span class="util-cat">${cat}</span> — ${getTiendasDeBurg(burgName).length} tiendas con items mágicos</div>`;
+}
+
+const RAREZA_COLORS = { 'Common': '#9e9e9e', 'Uncommon': '#4caf50', 'Rare': '#2196f3', 'Very Rare': '#9c27b0' };
+
+function generarInventario() {
+  const burgName = document.getElementById('util-burg').value;
+  const tienda = document.getElementById('util-tienda').value;
+  if (!burgName || !tienda) { alert('Selecciona ciudad y tipo de tienda.'); return; }
+  const r = generarItems(burgName, tienda);
+  document.getElementById('util-resultado').innerHTML = `
+    <div class="util-result-header">
+      <span>${r.tienda} en ${r.burg}</span>
+      <span class="util-meta">Costo máx: ${r.costoMax.toLocaleString()} GP — ${r.items.length} items</span>
+      <button class="btn btn-sm" onclick="generarInventario()">&#8635; Re-generar</button>
+    </div>
+    <table class="util-table">
+      <thead><tr><th>Item</th><th>Rareza</th><th>Precio</th></tr></thead>
+      <tbody>${r.items.map(it => `<tr><td>${escapeHtml(it.nombre)}</td><td><span class="util-rareza" style="background:${RAREZA_COLORS[it.rareza] || '#666'}">${it.rareza}</span></td><td class="util-precio">${it.precio.toLocaleString()} GP</td></tr>`).join('')}</tbody>
+    </table>`;
 }
 
 // ── RELOAD DATA ───────────────────────────────────────────────────

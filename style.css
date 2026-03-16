@@ -1083,6 +1083,26 @@ body.bg-app {
 .ssm-chip-x { cursor: pointer; opacity: 0.5; font-size: 1rem; line-height: 1; }
 .ssm-chip-x:hover { opacity: 1; color: #dc3545; }
 
+/* Utilidades — Generador de Tiendas */
+.util-card .card-title { font-size: 1rem; }
+.util-panel { max-width: 800px; margin: 20px auto 0; background: var(--bg-card); border: 1px solid var(--border-gold); padding: 20px; }
+.util-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.util-title { font-family: 'Cinzel', serif; color: var(--border-gold); margin-bottom: 16px; font-size: 1.1rem; }
+.util-controls { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
+.util-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 180px; }
+.util-field label { font-family: 'Cinzel', serif; font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.util-field select { padding: 8px; background: var(--bg-card); border: 1px solid var(--border-gold); color: var(--text-main); font-family: 'Cinzel', serif; font-size: 0.85rem; }
+.util-info-bar { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 12px; }
+.util-cat { text-transform: capitalize; font-style: italic; }
+.util-result-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; font-family: 'Cinzel', serif; font-size: 0.85rem; color: var(--text-main); flex-wrap: wrap; }
+.util-meta { font-size: 0.75rem; color: var(--text-dim); }
+.util-table { width: 100%; border-collapse: collapse; }
+.util-table th { font-family: 'Cinzel', serif; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--border-gold); border-bottom: 1px solid var(--border-gold); padding: 6px 8px; text-align: left; }
+.util-table td { padding: 6px 8px; border-bottom: 1px solid rgba(200,169,110,0.15); font-size: 0.85rem; color: var(--text-main); }
+.util-table tr:hover { background: rgba(200,169,110,0.05); }
+.util-rareza { padding: 2px 8px; font-size: 0.7rem; color: #fff; border-radius: 2px; font-family: 'Cinzel', serif; }
+.util-precio { font-family: 'Cinzel', serif; color: var(--border-gold); }
+
 /* City links in SVG */
 .map-city-link { cursor: pointer !important; }
 .map-city-link:hover { fill: var(--border-gold) !important; }

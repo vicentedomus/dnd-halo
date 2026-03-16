@@ -270,6 +270,14 @@ function toNumber(val) {
 function toCheckbox(val) {
   return { checkbox: !!val };
 }
+function toDate(val) {
+  return val ? { date: { start: val } } : { date: null };
+}
+function toMultiSelect(val) {
+  if (!val) return { multi_select: [] };
+  const arr = Array.isArray(val) ? val : [val];
+  return { multi_select: arr.filter(Boolean).map(v => ({ name: v })) };
+}
 function toRelation(val) {
   if (!val) return { relation: [] };
   if (Array.isArray(val)) return { relation: val.filter(v => v?.notion_id).map(v => ({ id: v.notion_id })) };
@@ -351,10 +359,16 @@ const WRITE_MAP = {
   }),
   notas_dm: (d) => ({
     'Name': toTitle(d.nombre),
+    'Fecha': toDate(d.fecha),
+    'Jugadores presentes': toMultiSelect(d.jugadores_presentes),
+    'Quests': toRelation(d.quests),
     'Resumen': toRichText(d.resumen),
   }),
   notas_jugadores: (d) => ({
     'Name': toTitle(d.nombre),
+    'Fecha': toDate(d.fecha),
+    'Jugador': toMultiSelect(d.jugador),
+    'Item': toRelation(d.items),
     'Resumen': toRichText(d.resumen),
   }),
   lugares: (d) => ({
