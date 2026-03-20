@@ -687,6 +687,8 @@ function renderNPCsGrid() {
   if (fEstado) items = items.filter(n => n.estado === fEstado);
   if (fTipo)   items = items.filter(n => n.tipo_npc === fTipo);
 
+  items = filterBySearch(items, 'search-npcs', ['nombre', 'raza', 'tipo_npc', 'descripcion']);
+
   if (!items.length) { grid.innerHTML = emptyState('No hay NPCs con esos filtros.'); return; }
 
   grid.innerHTML = items.map(n => `
