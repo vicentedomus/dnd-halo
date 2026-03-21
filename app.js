@@ -1930,6 +1930,7 @@ function renderMapMarkers() {
 
 const UTIL_CARDS = [
   { id: 'shop-gen', title: 'Generador de Inventario', desc: 'Genera inventario aleatorio de tiendas mágicas según ciudad y tipo de establecimiento.', icon: '&#9876;' },
+  { id: 'campaign-ai', title: 'Asistente de Campaña', desc: 'Chat IA para preparar sesiones, generar NPCs, diseñar encuentros y consultar la campaña.', icon: '&#9876;' },
 ];
 
 function renderUtilidades() {
@@ -1949,6 +1950,7 @@ function renderUtilidades() {
 
 function openUtilidad(id) {
   if (id === 'shop-gen') openShopGenerator();
+  if (id === 'campaign-ai') openAsistente();
 }
 
 function openShopGenerator() {
