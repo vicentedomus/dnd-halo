@@ -64,51 +64,70 @@ Con el contexto en mano, haz **solo las preguntas necesarias** — no preguntes 
 
 Omite las preguntas cuya respuesta ya esté clara en el contexto.
 
-## Paso 3 — Generar propuesta
+## Paso 3 — Generar propuesta (8 pasos de Sly Flourish)
 
-Genera el contenido siguiendo esta estructura exacta:
+Genera el contenido siguiendo los 8 pasos del Lazy DM. Esta es la estructura exacta:
 
 # 📜 Propuesta Sesión — [Título narrativo]
 
-## ⚡ Apertura fuerte
+## 1. 👥 Revisión de Personajes
+[Para cada PJ, una línea con: motivación actual + algo pendiente o gancho personal.
+Buscar formas de conectar el contenido de ESTA sesión con algo personal de cada uno.]
+| PJ | Motivación actual | Gancho personal esta sesión |
+|----|-------------------|----------------------------|
+
+## 2. ⚡ Inicio Fuerte (Strong Start)
 [Escena concreta que lanza la acción de inmediato. Sin preámbulos.
-Describe exactamente qué ven/oyen/sienten los jugadores al abrir los ojos en la sesión.]
+Describe exactamente qué ven/oyen/sienten los jugadores al abrir los ojos en la sesión.
+Tipos: combate en curso, descubrimiento inquietante, mensaje urgente, confrontación social.]
 
-## 🗺️ Escenas posibles
-[3-5 escenas como ingredientes. Cada una: objetivo + obstáculo. El DM no tiene
-que usarlas todas ni en ese orden. Son posibilidades, no un script.]
-- **[Nombre de escena]** — Objetivo: [...]. Obstáculo: [...].
+## 3. 🗺️ Escenas Posibles
+[3-5 escenas como ingredientes sueltos. No son actos — son posibilidades.
+El DM elige cuáles usar y en qué orden. Calibrar por duración: 2h → 2-3, 3-4h → 4-5.]
+- **[Escena 1]** — Objetivo: [...]. Obstáculo: [...]. Ganancia: [...].
 
-## 🔍 Secretos y pistas
-[3-5 secretos que el party puede descubrir. Para cada secreto, múltiples caminos.
-No importa cuál encuentren — todos llevan al mismo lugar.]
-- **[Secreto 1]**
-  - Si hablan con [NPC]: [pista A]
-  - Si registran [lugar]: [pista B]
-  - Si tienen éxito en [habilidad]: [pista C]
+## 4. 🔍 Secretos y Pistas
+[5-10 frases cortas que revelan algo sobre NPCs, lugares, eventos o historia.
+NO atarlas a un lugar o tirada específica — el DM las entrega por cualquier camino.
+Nunca un secreto con un único camino para descubrirlo.]
+1. [Secreto/Pista]
+2. [Secreto/Pista]
+3. [Secreto/Pista]
 
-## 🎭 NPCs activos esta sesión
-| NPC | Ubicación | Rol en sesión | Qué quiere | Cómo suena |
-|-----|-----------|---------------|------------|------------|
+## 5. 🏰 Locaciones Fantásticas
+[2-3 lugares con descripciones sensoriales (máx 2-3 sentidos). Incluir elementos interactivos.]
+### [Nombre del lugar]
+- **Aspecto:** [qué ven]
+- **Sensación:** [qué sienten/huelen/oyen]
+- **Lo fantástico:** [qué lo hace memorable]
+- **Interactivo:** [qué pueden tocar, mover, romper]
 
-## ⚖️ Momento pivote
-[La decisión, confrontación o revelación central de la sesión.
-Lo que la hace memorable. Algo que cambia el estado del mundo o de los personajes.]
+## 6. 🎭 NPCs Importantes
+[Motivación + voz + detalle distintivo. Sin monólogos preparados.]
+| NPC | Ubicación | Qué quiere | Cómo suena | Detalle |
+|-----|-----------|------------|------------|---------|
 
-## 💰 Recompensas posibles
-[No solo oro — también información, aliados, reputación.]
+## 7. ⚔️ Monstruos / Encuentros
+[Stat blocks + tácticas. Para cada uno: motivación, terreno, bypass posible.]
+| Monstruo | CR | Motivación | Táctica | Bypass posible |
+|----------|----|------------|---------|----------------|
+
+## 8. 💰 Recompensas
+[No solo oro — información, aliados, reputación, acceso, items.
+Items que creen nuevas capacidades, no solo bonos numéricos.]
 - [Recompensa 1]: [condición para obtenerla]
 
-## 🎲 Cierre sugerido / Gancho siguiente sesión
-- Cierre natural: [situación al terminar]
-- Gancho 1: [algo sin resolver que tire al party hacia adelante]
+## Extras
+### ⚖️ Momento Pivote
+[La decisión o revelación central. Lo que hace la sesión memorable.]
 
-## 📝 Notas privadas DM
-[Solo para Vicente: motivaciones ocultas, contingencias, secretos a largo plazo.]
-- [NPC]: su verdadera motivación es [...]
-- Si el party hace [X]: contingencia es [...]
+### 🎲 Gancho siguiente sesión
+- [Algo sin resolver que tire al party hacia adelante]
 
-**Principios guía:**
+### 📝 Notas privadas DM
+- [Motivaciones ocultas, contingencias, secretos a largo plazo]
+
+**Principios guía (Lazy DM):**
 - Prep = ingredientes, no script. El DM improvisa sobre esto.
 - Strong Start: la apertura lanza la acción de inmediato, sin preámbulo.
 - Escenas son posibilidades, no actos obligatorios.
