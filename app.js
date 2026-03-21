@@ -332,6 +332,17 @@ function buildDetailHTML(section, data) {
     case 'personajes': {
       const p = data;
       const jugador = p.jugador ? (typeof p.jugador === 'object' ? p.jugador.nombre : p.jugador) : null;
+      const ddbId = ddbExtractId(p.dndbeyond_url);
+      const ddbSection = ddbId ? `
+        <div class="detail-section" style="margin-top:12px">
+          <div class="ddb-toggle-bar">
+            <button class="btn btn-sm ddb-toggle-btn" onclick="ddbToggleSheet(this, '${ddbId}')">
+              &#9862; Ver hoja D&D Beyond
+            </button>
+            <a href="${escapeHtml(p.dndbeyond_url)}" target="_blank" rel="noopener" class="btn btn-sm" style="font-size:0.75rem">Abrir en D&D Beyond &#8599;</a>
+          </div>
+          <div class="ddb-container" id="ddb-sheet-${ddbId}" style="display:none"></div>
+        </div>` : '';
       return [
         row('Clase', escapeHtml(p.clase)),
         p.subclase ? row('Subclase', escapeHtml(p.subclase)) : '',
@@ -342,6 +353,7 @@ function buildDetailHTML(section, data) {
         (p.hp_maximo !== null && p.hp_maximo !== undefined) ? row('HP M\u00e1x', p.hp_maximo) : '',
         textBlock('Descripci\u00f3n', p.descripcion),
         (p.items_magicos && p.items_magicos.length) ? `<div class="detail-section"><div class="detail-label">Items M\u00e1gicos</div><ul class="card-list">${p.items_magicos.map(i => `<li>${relChip('items', i.notion_id, i.nombre)}</li>`).join('')}</ul></div>` : '',
+        ddbSection,
       ].join('');
     }
     case 'quests': {
@@ -935,6 +947,7 @@ const FORM_SCHEMAS = {
     { key:'hp_maximo', label:'HP M\u00e1x', type:'number' },
     { key:'descripcion', label:'Descripci\u00f3n', type:'textarea' },
     { key:'es_pj',     label:'Es PJ',     type:'checkbox' },
+    { key:'dndbeyond_url', label:'D&D Beyond URL', type:'text', placeholder:'https://www.dndbeyond.com/characters/123456' },
   ],
   quests: [
     { key:'nombre',   label:'Nombre',  type:'text', required:true },
@@ -2022,6 +2035,19 @@ function generarInventario() {
       <thead><tr><th>Item</th><th>Rareza</th><th>Precio</th></tr></thead>
       <tbody>${r.items.map(it => `<tr><td>${escapeHtml(it.nombre)}</td><td><span class="util-rareza" style="background:${RAREZA_COLORS[it.rareza] || '#666'}">${it.rareza}</span></td><td class="util-precio">${it.precio.toLocaleString()} GP</td></tr>`).join('')}</tbody>
     </table>`;
+}
+
+// ── D&D BEYOND TOGGLE ─────────────────────────────────────────────
+function ddbToggleSheet(btn, characterId) {
+  const container = document.getElementById('ddb-sheet-' + characterId);
+  if (!container) return;
+  const isHidden = container.style.display === 'none';
+  container.style.display = isHidden ? 'block' : 'none';
+  btn.innerHTML = isHidden ? '&#9862; Ocultar hoja D&D Beyond' : '&#9862; Ver hoja D&D Beyond';
+  if (isHidden && !container.dataset.loaded) {
+    container.dataset.loaded = '1';
+    ddbLoadAndShow(characterId, container);
+  }
 }
 
 // ── RELOAD DATA ───────────────────────────────────────────────────
