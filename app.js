@@ -45,6 +45,8 @@ async function bootApp() {
   if (isDM()) app.classList.add('is-dm');
 
   await loadData();
+  const titleEl = document.getElementById('header-section-title');
+  if (titleEl) titleEl.textContent = 'Notas de Sesión';
   renderAll();
 }
 
@@ -60,9 +62,12 @@ async function loadData() {
 }
 
 // ── TAB SWITCHING ───────────────────────────────────────────────
+const TAB_TITLES = { notas:'Notas de Sesión', npcs:'NPCs', establecimientos:'Establecimientos', ciudades:'Ciudades', lugares:'Lugares', items:'Items Mágicos', personajes:'Personajes', quests:'Quests', mapa:'Mapa', utilidades:'Utilidades' };
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === `section-${tab}`));
+  const titleEl = document.getElementById('header-section-title');
+  if (titleEl) titleEl.textContent = TAB_TITLES[tab] || tab;
   const content = document.getElementById('content');
   if (tab === 'mapa') {
     content.classList.add('map-active');
