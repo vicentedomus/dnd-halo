@@ -887,7 +887,7 @@ body.bg-app {
   flex: 1;
   overflow: hidden;
   cursor: grab;
-  background: #2a3040;
+  background: #466eab;
   user-select: none;
   -webkit-user-select: none;
   position: relative;
@@ -989,7 +989,7 @@ body.bg-app {
 .map-legend {
   position: absolute;
   bottom: 12px;
-  right: 12px;
+  left: 12px;
   background: rgba(14, 14, 14, 0.92);
   backdrop-filter: blur(12px);
   border: 1px solid var(--outline-variant);
