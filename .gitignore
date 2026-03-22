@@ -1,0 +1,8 @@
+node_modules/
+.claude/
+playwright-report/
+test-results/
+supabase/.temp/
+stitch-mockups/
+exports/
+migrate/
