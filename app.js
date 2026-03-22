@@ -253,6 +253,7 @@ function openDetailFromCard(el) {
   let arr;
   if (section === 'notas_dm') arr = DATA.notas_dm || [];
   else if (section === 'notas_jugadores') arr = DATA.notas_jugadores || [];
+  else if (section === 'personajes') arr = DATA.players || [];
   else arr = DATA[section] || [];
   const item = arr.find(x => x.notion_id === notionId);
   if (item) openDetail(section, item);
@@ -1937,6 +1938,7 @@ function renderMapMarkers() {
 const UTIL_CARDS = [
   { id: 'shop-gen', title: 'Generador de Inventario', desc: 'Genera inventario aleatorio de tiendas mágicas según ciudad y tipo de establecimiento.', icon: '&#9876;' },
   { id: 'campaign-ai', title: 'Asistente de Campaña', desc: 'Chat IA para preparar sesiones, generar NPCs, diseñar encuentros y consultar la campaña.', icon: '&#9876;' },
+  { id: 'session-prep', title: 'Preparador de Sesiones', desc: 'Prepara sesiones perfectas con los 8 pasos de Sly Flourish.', icon: '&#128220;' },
 ];
 
 function renderUtilidades() {
@@ -1957,6 +1959,7 @@ function renderUtilidades() {
 function openUtilidad(id) {
   if (id === 'shop-gen') openShopGenerator();
   if (id === 'campaign-ai') openAsistente();
+  if (id === 'session-prep') openPreparador();
 }
 
 function openShopGenerator() {
