@@ -500,6 +500,7 @@ export default {
     const origin = request.headers.get('Origin') || '';
     const allowedOrigins = [
       env.ALLOWED_ORIGIN || 'https://vicentedomus.github.io',
+      'https://dnd-halo.vercel.app',
       'http://127.0.0.1:5500',
       'http://localhost:5500',
     ];
