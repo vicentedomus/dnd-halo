@@ -110,7 +110,7 @@ function buildCampaignContext() {
       const estab = n.establecimiento ? ` | Establecimiento: ${n.establecimiento.nombre}` : '';
       const estado = n.estado ? ` | Estado: ${n.estado}` : '';
       const conocido = n.conocido_jugadores ? ' [conocido]' : ' [desconocido]';
-      const desc = n.descripcion ? ` — ${n.descripcion}` : '';
+      const desc = n.primera_impresion ? ` — ${n.primera_impresion}` : '';
       parts.push(`- ${n.nombre} (${n.raza || '?'}, ${n.tipo_npc || n.rol || '?'})${ciudad}${estab}${estado}${conocido}${desc}`);
     });
   }

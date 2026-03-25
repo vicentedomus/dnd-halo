@@ -232,7 +232,8 @@ function showPreview(tab, notionId, event) {
     if (rec.rareza) html += `<div class="preview-row">${rarezaBadge(rec.rareza)}</div>`;
     if (rec.tipo)   html += `<div class="preview-row"><span class="badge tipo-badge">${escapeHtml(rec.tipo)}</span></div>`;
   }
-  if (rec.descripcion) html += `<div class="preview-desc">${escapeHtml(rec.descripcion).substring(0,100)}${rec.descripcion.length > 100 ? '…' : ''}</div>`;
+  const previewDesc = rec.descripcion || rec.primera_impresion || rec.descripcion_interior || '';
+  if (previewDesc) html += `<div class="preview-desc">${escapeHtml(previewDesc).substring(0,100)}${previewDesc.length > 100 ? '…' : ''}</div>`;
 
   const el = document.getElementById('card-preview');
   el.innerHTML = html;
@@ -349,7 +350,9 @@ function buildDetailHTML(section, data) {
         row('Raza', escapeHtml(n.raza)),
         row('Ciudad', n.ciudad ? relChip('ciudades', n.ciudad.notion_id, n.ciudad.nombre) : ''),
         row('Establecimiento', n.establecimiento ? relChip('establecimientos', n.establecimiento.notion_id, n.establecimiento.nombre) : ''),
-        textBlock('Descripci\u00f3n', n.descripcion),
+        n.edad ? row('Edad', `${n.edad} años`) : '',
+        textBlock('Primera Impresi\u00f3n', n.primera_impresion),
+        isDM() && n.notas_roleplay ? textBlock('Notas Roleplay (DM)', n.notas_roleplay) : '',
         (n.quests && n.quests.length) ? row('Quests', n.quests.map(q => relChip('quests', q.notion_id, q.nombre)).join(' ')) : '',
         (n.items_magicos && n.items_magicos.length) ? row('Items', n.items_magicos.map(i => relChip('items', i.notion_id, i.nombre)).join(' ')) : '',
         (n.lugares && n.lugares.length) ? row('Lugares', n.lugares.map(l => relChip('lugares', l.notion_id, l.nombre)).join(' ')) : '',
@@ -408,7 +411,8 @@ function buildDetailHTML(section, data) {
         row('Tipo', e.tipo ? `<span class="badge tipo-badge">${escapeHtml(e.tipo)}</span>` : ''),
         row('Ciudad', e.ciudad ? relChip('ciudades', e.ciudad.notion_id, e.ciudad.nombre) : ''),
         row('Due\u00f1o', e.dueno ? relChip('npcs', e.dueno.notion_id, e.dueno.nombre) : ''),
-        textBlock('Descripci\u00f3n', e.descripcion),
+        textBlock('Exterior', e.descripcion_exterior),
+        textBlock('Interior', e.descripcion_interior),
       ].join('');
     }
     case 'lugares': {
@@ -743,7 +747,7 @@ function renderEstablecimientosGrid() {
       </div>
       <div class="card-body">
         ${e.dueno ? `<div class="card-meta"><span class="meta-item"><span class="meta-label">Due\u00f1o:</span> ${relChip('npcs', e.dueno.notion_id, e.dueno.nombre, true)}</span></div>` : ''}
-        ${e.descripcion ? `<div class="card-desc">${escapeHtml(e.descripcion)}</div>` : ''}
+        ${e.descripcion_interior ? `<div class="card-desc">${escapeHtml(e.descripcion_interior)}</div>` : ''}
       </div>
     </div>`).join('');
 }
@@ -830,7 +834,7 @@ function renderNPCsGrid() {
   if (fEstado) items = items.filter(n => n.estado === fEstado);
   if (fTipo)   items = items.filter(n => n.tipo_npc === fTipo);
 
-  items = filterBySearch(items, 'search-npcs', ['nombre', 'raza', 'tipo_npc', 'descripcion']);
+  items = filterBySearch(items, 'search-npcs', ['nombre', 'raza', 'tipo_npc', 'primera_impresion']);
 
   if (!items.length) { grid.innerHTML = emptyState('No hay NPCs con esos filtros.'); return; }
 
@@ -853,7 +857,7 @@ function renderNPCsGrid() {
           ${n.ciudad ? `<span class="meta-item"><span class="meta-label">Ciudad:</span> ${relChip('ciudades', n.ciudad.notion_id, n.ciudad.nombre, true)}</span>` : ''}
           ${n.establecimiento ? `<span class="meta-item"><span class="meta-label">Lugar:</span> ${relChip('establecimientos', n.establecimiento.notion_id, n.establecimiento.nombre, true)}</span>` : ''}
         </div>
-        ${n.descripcion ? `<div class="card-desc">${escapeHtml(n.descripcion).substring(0,120)}${n.descripcion.length > 120 ? '\u2026' : ''}</div>` : ''}
+        ${n.primera_impresion ? `<div class="card-desc">${escapeHtml(n.primera_impresion).substring(0,120)}${n.primera_impresion.length > 120 ? '\u2026' : ''}</div>` : ''}
       </div>
     </div>`).join('');
 }
@@ -1318,10 +1322,11 @@ const FORM_SCHEMAS = {
   ],
   establecimientos: [
     { key:'nombre',  label:'Nombre', type:'text', required:true },
-    { key:'tipo',    label:'Tipo',   type:'select', options:['','Taberna','Librer\u00eda','Herrero','Templo','Tienda de Armas','Tienda Objetos M\u00e1gicos','Gremio','Gremio de Ladrones','Otro'] },
+    { key:'tipo',    label:'Tipo',   type:'select', options:['','Taberna','Comercio General','Librer\u00eda','Herrero','Templo','Tienda de Armas','Tienda Objetos M\u00e1gicos','Gremio','Gremio de Ladrones','Otro'] },
     { key:'ciudad',  label:'Ciudad', type:'select-rel', source:'ciudades' },
     { key:'dueno',   label:'Due\u00f1o', type:'select-rel', source:'npcs' },
-    { key:'descripcion', label:'Descripci\u00f3n', type:'textarea' },
+    { key:'descripcion_exterior', label:'Descripci\u00f3n Exterior', type:'textarea' },
+    { key:'descripcion_interior', label:'Descripci\u00f3n Interior', type:'textarea' },
     { key:'conocido_jugadores', label:'Conocido por jugadores', type:'checkbox' },
   ],
   lugares: [
@@ -1344,7 +1349,9 @@ const FORM_SCHEMAS = {
     { key:'estado',         label:'Estado',   type:'select', options:['Vivo','Muerto'] },
     { key:'ciudad',         label:'Ciudad',   type:'select-rel', source:'ciudades' },
     { key:'establecimiento', label:'Establecimiento', type:'select-rel', source:'establecimientos' },
-    { key:'descripcion',    label:'Descripci\u00f3n', type:'textarea' },
+    { key:'edad',              label:'Edad', type:'number' },
+    { key:'primera_impresion', label:'Primera Impresi\u00f3n', type:'textarea' },
+    { key:'notas_roleplay',    label:'Notas Roleplay (DM)', type:'textarea', dmOnly:true },
     { key:'conocido_jugadores', label:'Conocido por jugadores', type:'checkbox' },
   ],
   items: [

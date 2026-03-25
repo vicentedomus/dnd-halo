@@ -700,7 +700,7 @@ async function generatePlan() {
   // NPCs: objeto completo desde DATA.npcs
   const npcsCompletos = prepSelectedNpcs.map(sel => {
     const n = (DATA.npcs || []).find(x => x.notion_id === sel.id) || {};
-    return { nombre: sel.nombre, raza: n.raza || '', tipo_npc: n.tipo_npc || '', descripcion: n.descripcion || '' };
+    return { nombre: sel.nombre, raza: n.raza || '', tipo_npc: n.tipo_npc || '', descripcion: n.primera_impresion || '' };
   });
 
   // Locaciones: objeto completo desde las 3 fuentes
