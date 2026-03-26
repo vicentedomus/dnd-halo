@@ -197,6 +197,215 @@ function estadoBadge(e) {
   return `<span class="badge ${e === 'Vivo' ? 'estado-vivo' : 'estado-muerto'}">${e}</span>`;
 }
 
+// ── @MENTION SYSTEM ──────────────────────────────────────────────
+
+/** Categorías de entidades para el dropdown de menciones */
+const MENTION_SOURCES = [
+  { key: 'npcs',              label: 'NPC',             icon: '👤' },
+  { key: 'ciudades',          label: 'Ciudad',          icon: '🏙' },
+  { key: 'establecimientos',  label: 'Establecimiento', icon: '🏪' },
+  { key: 'lugares',           label: 'Lugar',           icon: '🗺' },
+  { key: 'items',             label: 'Item',            icon: '⚔' },
+  { key: 'quests',            label: 'Quest',           icon: '★' },
+  { key: 'players',           label: 'Personaje',       icon: '🎭', tab: 'personajes' },
+];
+
+/** Recopila todas las entidades mencionables filtradas por query */
+function getMentionResults(query) {
+  const q = query.toLowerCase();
+  const results = [];
+  for (const src of MENTION_SOURCES) {
+    const arr = DATA[src.key] || [];
+    for (const item of arr) {
+      if (!item.nombre) continue;
+      if (q && !item.nombre.toLowerCase().includes(q)) continue;
+      results.push({ section: src.tab || src.key, notionId: item.notion_id, nombre: item.nombre, icon: src.icon, label: src.label });
+    }
+    if (results.length > 50) break;
+  }
+  return results.slice(0, 20);
+}
+
+/** Parsea texto con @menciones y devuelve HTML con links clickeables */
+function parseMentions(escapedHtml) {
+  return escapedHtml.replace(/@\[([^\]]+)\]\(([^:]+):([^)]+)\)/g, (_, nombre, section, notionId) => {
+    return `<span class="mention-link" onclick="event.stopPropagation();navegarA('${section}','${notionId}')" onmouseenter="showPreview('${section}','${notionId}',event)" onmouseleave="hidePreview()">${nombre}</span>`;
+  });
+}
+
+/** Limpia @menciones dejando solo el nombre (para previews en cards) */
+function stripMentions(text) {
+  if (!text) return text;
+  return text.replace(/@\[([^\]]+)\]\([^)]+\)/g, '$1');
+}
+
+/** Convierte texto raw (con @menciones) a HTML para contenteditable */
+function textToContentEditable(text) {
+  if (!text) return '';
+  return escapeHtml(text)
+    .replace(/@\[([^\]]+)\]\(([^:]+):([^)]+)\)/g, (_, nombre, section, notionId) => {
+      return `<span class="ce-mention" contenteditable="false" data-section="${section}" data-id="${notionId}">${nombre}</span>`;
+    })
+    .replace(/\n/g, '<br>');
+}
+
+/** Extrae texto raw (con @menciones) desde un contenteditable div */
+function contentEditableToText(el) {
+  let text = '';
+  for (const node of el.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      text += node.textContent;
+    } else if (node.nodeName === 'BR') {
+      text += '\n';
+    } else if (node.classList && node.classList.contains('ce-mention')) {
+      text += `@[${node.textContent}](${node.dataset.section}:${node.dataset.id})`;
+    } else if (node.nodeName === 'DIV') {
+      // Browsers sometimes wrap lines in divs
+      if (text.length > 0 && !text.endsWith('\n')) text += '\n';
+      text += contentEditableToText(node);
+    } else {
+      text += node.textContent || '';
+    }
+  }
+  return text;
+}
+
+/** Estado del dropdown de menciones */
+let mentionState = null; // { textarea, dropdown, startPos }
+
+function initMentionTextarea(ceDiv) {
+  const wrap = document.createElement('div');
+  wrap.className = 'mention-wrap';
+  ceDiv.parentNode.insertBefore(wrap, ceDiv);
+  wrap.appendChild(ceDiv);
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'mention-dropdown';
+  wrap.appendChild(dropdown);
+
+  ceDiv.addEventListener('input', () => onMentionInput(ceDiv, dropdown));
+  ceDiv.addEventListener('keydown', (e) => onMentionKeydown(e, ceDiv, dropdown));
+  ceDiv.addEventListener('blur', () => setTimeout(() => { dropdown.classList.remove('open'); mentionState = null; }, 200));
+}
+
+/** Obtiene el texto antes del cursor en un contenteditable */
+function getTextBeforeCursor(ceDiv) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return { text: '', range: null };
+  const range = sel.getRangeAt(0).cloneRange();
+  range.collapse(true);
+
+  // Recorrer nodos hacia atrás para construir el texto antes del cursor
+  const preRange = document.createRange();
+  preRange.selectNodeContents(ceDiv);
+  preRange.setEnd(range.startContainer, range.startOffset);
+
+  const frag = preRange.cloneContents();
+  const tmp = document.createElement('div');
+  tmp.appendChild(frag);
+  // Convertir BR y mention spans a texto plano
+  tmp.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+  tmp.querySelectorAll('.ce-mention').forEach(m => m.replaceWith(`@[${m.textContent}]`));
+  return { text: tmp.textContent || '', range };
+}
+
+function onMentionInput(ceDiv, dropdown) {
+  const { text: before } = getTextBeforeCursor(ceDiv);
+  const atIdx = before.lastIndexOf('@');
+
+  if (atIdx === -1 || (atIdx > 0 && /\w/.test(before[atIdx - 1]))) {
+    dropdown.classList.remove('open');
+    mentionState = null;
+    return;
+  }
+
+  const query = before.substring(atIdx + 1);
+  if (query.includes('\n') || query.length > 30) {
+    dropdown.classList.remove('open');
+    mentionState = null;
+    return;
+  }
+
+  const results = getMentionResults(query);
+  if (!results.length) {
+    dropdown.classList.remove('open');
+    mentionState = null;
+    return;
+  }
+
+  mentionState = { ceDiv, dropdown, atIdx, queryLen: query.length };
+  dropdown.innerHTML = results.map((r, i) =>
+    `<div class="mention-option${i === 0 ? ' active' : ''}" data-idx="${i}" data-section="${r.section}" data-id="${r.notionId}" data-nombre="${escapeHtml(r.nombre)}">${r.icon} <strong>${escapeHtml(r.nombre)}</strong> <span class="mention-type">${r.label}</span></div>`
+  ).join('');
+  dropdown.classList.add('open');
+
+  dropdown.querySelectorAll('.mention-option').forEach(opt => {
+    opt.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      insertMention(opt.dataset.section, opt.dataset.id, opt.dataset.nombre);
+    });
+  });
+}
+
+function onMentionKeydown(e, ceDiv, dropdown) {
+  if (!mentionState || !dropdown.classList.contains('open')) return;
+  const opts = [...dropdown.querySelectorAll('.mention-option')];
+  const activeIdx = opts.findIndex(o => o.classList.contains('active'));
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    opts[activeIdx]?.classList.remove('active');
+    opts[(activeIdx + 1) % opts.length]?.classList.add('active');
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    opts[activeIdx]?.classList.remove('active');
+    opts[(activeIdx - 1 + opts.length) % opts.length]?.classList.add('active');
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    const active = dropdown.querySelector('.mention-option.active');
+    if (active) {
+      e.preventDefault();
+      insertMention(active.dataset.section, active.dataset.id, active.dataset.nombre);
+    }
+  } else if (e.key === 'Escape') {
+    dropdown.classList.remove('open');
+    mentionState = null;
+  }
+}
+
+function insertMention(section, notionId, nombre) {
+  if (!mentionState) return;
+  const { ceDiv, dropdown, queryLen } = mentionState;
+
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+
+  // Borrar el "@query" que escribió el usuario
+  range.setStart(range.startContainer, range.startOffset - queryLen - 1); // -1 para el @
+  range.deleteContents();
+
+  // Insertar el chip de mención
+  const chip = document.createElement('span');
+  chip.className = 'ce-mention';
+  chip.contentEditable = 'false';
+  chip.dataset.section = section;
+  chip.dataset.id = notionId;
+  chip.textContent = nombre;
+  range.insertNode(chip);
+
+  // Mover cursor después del chip
+  const space = document.createTextNode('\u00A0');
+  chip.after(space);
+  range.setStartAfter(space);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  ceDiv.focus();
+  dropdown.classList.remove('open');
+  mentionState = null;
+}
+
 // ── RELATION CHIP (clickeable + hover preview) ───────────────────
 function relChip(tab, notionId, nombre, onCard = false) {
   if (!nombre) return '—';
@@ -233,7 +442,7 @@ function showPreview(tab, notionId, event) {
     if (rec.tipo)   html += `<div class="preview-row"><span class="badge tipo-badge">${escapeHtml(rec.tipo)}</span></div>`;
   }
   const previewDesc = rec.descripcion || rec.primera_impresion || rec.descripcion_interior || '';
-  if (previewDesc) html += `<div class="preview-desc">${escapeHtml(previewDesc).substring(0,100)}${previewDesc.length > 100 ? '…' : ''}</div>`;
+  if (previewDesc) { const clean = stripMentions(previewDesc); html += `<div class="preview-desc">${escapeHtml(clean).substring(0,100)}${clean.length > 100 ? '…' : ''}</div>`; }
 
   const el = document.getElementById('card-preview');
   el.innerHTML = html;
@@ -322,6 +531,7 @@ function switchToEdit() {
 
   body.innerHTML = schema.map(field => formFieldHTML(field, data)).join('');
   initSearchableSelects(body);
+  body.querySelectorAll('.ce-textarea').forEach(ce => initMentionTextarea(ce));
 
   const footer = document.getElementById('modal-footer');
   footer.innerHTML = `
@@ -337,7 +547,7 @@ function buildDetailHTML(section, data) {
   }
   function textBlock(label, text) {
     if (!text) return '';
-    return `<div class="detail-section"><div class="detail-label">${label}</div><div class="detail-text">${escapeHtml(text).replace(/\n/g,'<br>')}</div></div>`;
+    return `<div class="detail-section"><div class="detail-label">${label}</div><div class="detail-text">${parseMentions(escapeHtml(text)).replace(/\n/g,'<br>')}</div></div>`;
   }
   switch(section) {
     case 'npcs': {
@@ -638,7 +848,7 @@ function renderPersonajes() {
       <div class="card-body">
         <div class="card-meta">${jugadorStr}${subclaseStr}</div>
         ${stats}
-        ${p.descripcion ? `<div class="card-desc">${escapeHtml(p.descripcion)}</div>` : ''}
+        ${p.descripcion ? `<div class="card-desc">${escapeHtml(stripMentions(p.descripcion))}</div>` : ''}
         ${itemsList}
       </div>
     </div>`;
@@ -667,7 +877,7 @@ function renderQuests() {
         ${(q.quest_npcs && q.quest_npcs.length) ? `<div class="card-meta"><span class="meta-label">NPCs:</span> ${q.quest_npcs.map(n => relChip('npcs', n.notion_id, n.nombre, true)).join(' ')}</div>` : ''}
         ${(q.lugares && q.lugares.length) ? `<div class="card-meta"><span class="meta-label">Lugares:</span> ${q.lugares.map(l => relChip('lugares', l.notion_id, l.nombre, true)).join(' ')}</div>` : ''}
         ${(q.ciudades && q.ciudades.length) ? `<div class="card-meta"><span class="meta-label">Ciudades:</span> ${q.ciudades.map(c => relChip('ciudades', c.notion_id, c.nombre, true)).join(' ')}</div>` : ''}
-        ${q.resumen ? `<div class="card-desc">${escapeHtml(q.resumen).substring(0,150)}${q.resumen.length > 150 ? '\u2026' : ''}</div>` : ''}
+        ${q.resumen ? `<div class="card-desc">${escapeHtml(stripMentions(q.resumen)).substring(0,150)}${q.resumen.length > 150 ? '\u2026' : ''}</div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -698,7 +908,7 @@ function renderCiudades() {
           ${c.lider ? `<span class="meta-item"><span class="meta-label">L\u00edder:</span> ${escapeHtml(c.lider)}</span>` : ''}
           ${c.poblacion ? `<span class="meta-item"><span class="meta-label">Pob.:</span> ${c.poblacion.toLocaleString()}</span>` : ''}
         </div>
-        ${c.descripcion ? `<div class="card-desc">${escapeHtml(c.descripcion)}</div>` : ''}
+        ${c.descripcion ? `<div class="card-desc">${escapeHtml(stripMentions(c.descripcion))}</div>` : ''}
         ${cEstabs.length ? `<div style="margin-top:8px"><div style="font-family:'Cinzel',serif;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.1em;margin-bottom:4px">ESTABLECIMIENTOS</div><div style="display:flex;flex-wrap:wrap;gap:4px">${cEstabs.map(e => relChip('establecimientos', e.notion_id, e.nombre, true)).join('')}</div></div>` : ''}
         ${cNpcs.length ? `<div style="margin-top:8px"><div style="font-family:'Cinzel',serif;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.1em;margin-bottom:4px">NPCS</div><div style="display:flex;flex-wrap:wrap;gap:4px">${cNpcs.map(n => relChip('npcs', n.notion_id, n.nombre, true)).join('')}</div></div>` : ''}
       </div>
@@ -758,7 +968,7 @@ function renderEstablecimientosGrid() {
       </div>
       <div class="card-body">
         ${e.dueno ? `<div class="card-meta"><span class="meta-item"><span class="meta-label">Due\u00f1o:</span> ${relChip('npcs', e.dueno.notion_id, e.dueno.nombre, true)}</span></div>` : ''}
-        ${e.descripcion_interior ? `<div class="card-desc">${escapeHtml(e.descripcion_interior)}</div>` : ''}
+        ${e.descripcion_interior ? `<div class="card-desc">${escapeHtml(stripMentions(e.descripcion_interior))}</div>` : ''}
       </div>
     </div>`).join('');
 }
@@ -790,7 +1000,7 @@ function renderLugares() {
       <div class="card-body">
         ${l.ciudad?.nombre ? `<div class="card-meta"><span class="meta-item"><span class="meta-label">Ciudad:</span> ${escapeHtml(l.ciudad.nombre)}</span></div>` : ''}
         ${l.estado_exploracion ? `<div class="card-meta"><span class="meta-item"><span class="meta-label">Exploraci\u00f3n:</span> ${escapeHtml(l.estado_exploracion)}</span></div>` : ''}
-        ${l.descripcion ? `<div class="card-desc">${escapeHtml(l.descripcion)}</div>` : ''}
+        ${l.descripcion ? `<div class="card-desc">${escapeHtml(stripMentions(l.descripcion))}</div>` : ''}
       </div>
     </div>`).join('');
 }
@@ -868,7 +1078,7 @@ function renderNPCsGrid() {
           ${n.ciudad ? `<span class="meta-item"><span class="meta-label">Ciudad:</span> ${relChip('ciudades', n.ciudad.notion_id, n.ciudad.nombre, true)}</span>` : ''}
           ${n.establecimiento ? `<span class="meta-item"><span class="meta-label">Lugar:</span> ${relChip('establecimientos', n.establecimiento.notion_id, n.establecimiento.nombre, true)}</span>` : ''}
         </div>
-        ${n.primera_impresion ? `<div class="card-desc">${escapeHtml(n.primera_impresion).substring(0,120)}${n.primera_impresion.length > 120 ? '\u2026' : ''}</div>` : ''}
+        ${n.primera_impresion ? `<div class="card-desc">${escapeHtml(stripMentions(n.primera_impresion)).substring(0,120)}${n.primera_impresion.length > 120 ? '\u2026' : ''}</div>` : ''}
       </div>
     </div>`).join('');
 }
@@ -986,7 +1196,7 @@ function renderNotasGrid() {
       : '';
 
     const preview = n.resumen
-      ? `<div class="card-desc" style="border-top:none;padding-top:0">${escapeHtml(n.resumen).substring(0,120)}${n.resumen.length > 120 ? '\u2026' : ''}</div>`
+      ? `<div class="card-desc" style="border-top:none;padding-top:0">${escapeHtml(stripMentions(n.resumen)).substring(0,120)}${n.resumen.length > 120 ? '\u2026' : ''}</div>`
       : `<div class="card-desc" style="border-top:none;padding-top:0;opacity:0.5">Sin resumen a\u00fan.</div>`;
 
     return `
@@ -1408,7 +1618,8 @@ const SECTION_LABELS = {
 function formFieldHTML(field, data) {
   const v = data ? (data[field.key] !== undefined ? data[field.key] : '') : (field.type === 'checkbox' ? false : '');
   if (field.type === 'textarea') {
-    return `<div class="form-group"><label>${field.label}</label><textarea id="field-${field.key}" rows="4">${escapeHtml(v || '')}</textarea></div>`;
+    const rendered = textToContentEditable(v || '');
+    return `<div class="form-group"><label>${field.label}</label><div class="ce-textarea" id="field-${field.key}" contenteditable="true">${rendered}</div></div>`;
   }
   if (field.type === 'checkbox') {
     return `<div class="form-group"><div class="form-check"><input type="checkbox" id="field-${field.key}" ${v ? 'checked' : ''}><label for="field-${field.key}">${field.label}</label></div></div>`;
@@ -1472,6 +1683,7 @@ function openModal(section, data) {
 
   body.innerHTML = schema.map(field => formFieldHTML(field, data)).join('');
   initSearchableSelects(body);
+  body.querySelectorAll('.ce-textarea').forEach(ce => initMentionTextarea(ce));
 
   const footer = document.getElementById('modal-footer');
   footer.innerHTML = `
@@ -1640,6 +1852,8 @@ async function saveModal() {
       } else {
         newData[field.key] = null;
       }
+    } else if (field.type === 'textarea') {
+      newData[field.key] = contentEditableToText(el);
     } else {
       newData[field.key] = el.value;
     }
