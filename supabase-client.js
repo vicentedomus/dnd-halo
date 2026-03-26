@@ -312,6 +312,26 @@ async function sbDelete(table, sbid) {
   if (error) throw new Error(error.message);
 }
 
+// ── ENTITY NOTES (notas de jugadores por entidad) ─────────────────────
+
+async function sbLoadEntityNote(entityType, entityId) {
+  const { data, error } = await sbClient.from('entity_notes')
+    .select('contenido')
+    .eq('entity_type', entityType)
+    .eq('entity_id', entityId)
+    .maybeSingle();
+  if (error) { console.warn('entity_notes load:', error.message); return ''; }
+  return data ? data.contenido : '';
+}
+
+async function sbSaveEntityNote(entityType, entityId, contenido) {
+  const { error } = await sbClient.from('entity_notes').upsert(
+    { entity_type: entityType, entity_id: entityId, contenido, updated_at: new Date().toISOString() },
+    { onConflict: 'entity_type,entity_id' }
+  );
+  if (error) throw new Error(error.message);
+}
+
 // ── UPSERT MARCADOR ───────────────────────────────────────────────────
 
 async function sbUpsertMarker(notionId, x, y) {

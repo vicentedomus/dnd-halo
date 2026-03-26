@@ -629,7 +629,7 @@ body.bg-app {
   background: rgba(0,0,0,0.7);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  z-index: 500;
+  z-index: 9500;
   align-items: center;
   justify-content: center;
   padding: 20px;
@@ -751,6 +751,35 @@ body.bg-app {
    RELATION LINKS
    ============================================================ */
 /* .rel-link removed — unified to .rel-chip */
+
+/* Entity Notes (player notes per entity) */
+.entity-notes-section {
+  margin-top: 16px;
+  border-top: 1px solid var(--outline-variant);
+  padding-top: 12px;
+}
+.entity-notes-toggle {
+  cursor: pointer;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--on-surface-variant);
+  padding: 6px 0;
+  user-select: none;
+  transition: color 0.15s;
+}
+.entity-notes-toggle:hover { color: var(--primary); }
+.entity-notes-arrow { display: inline-block; transition: transform 0.15s; margin-right: 4px; }
+.entity-notes-body { margin-top: 8px; }
+.entity-notes-editor { min-height: 60px; max-height: 200px; font-size: 0.85rem; }
+.entity-notes-actions {
+  display: flex; align-items: center; gap: 10px; margin-top: 8px;
+}
+.entity-notes-status {
+  font-size: 0.75rem; color: var(--primary); font-family: 'Manrope', sans-serif;
+}
 
 /* Contenteditable textarea replacement */
 .ce-textarea {

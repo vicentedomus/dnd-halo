@@ -629,6 +629,8 @@ function openDetailFromCard(el) {
   if (item) openDetail(section, item);
 }
 
+const ENTITY_NOTES_SECTIONS = new Set(['npcs','ciudades','establecimientos','lugares','items']);
+
 function openDetail(section, data) {
   currentModalSection = section;
   currentModalData = data;
@@ -637,7 +639,25 @@ function openDetail(section, data) {
   document.getElementById('modal-title').textContent = escapeHtml(data.nombre || label);
 
   const body = document.getElementById('modal-body');
-  body.innerHTML = buildDetailHTML(section, data);
+  let html = buildDetailHTML(section, data);
+
+  // Sección de notas de jugadores (colapsable)
+  if (ENTITY_NOTES_SECTIONS.has(section) && data._sbid) {
+    html += `<div class="entity-notes-section">
+      <div class="entity-notes-toggle" onclick="toggleEntityNotes()">
+        <span class="entity-notes-arrow" id="en-arrow">▸</span> Notas de Jugadores
+      </div>
+      <div class="entity-notes-body" id="entity-notes-body" style="display:none">
+        <div class="ce-textarea entity-notes-editor" id="entity-notes-editor" contenteditable="true" data-placeholder="Escribe notas sobre este elemento..."></div>
+        <div class="entity-notes-actions">
+          <button class="btn btn-sm btn-success" onclick="saveEntityNote()">Guardar nota</button>
+          <span class="entity-notes-status" id="en-status"></span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  body.innerHTML = html;
   body.classList.add('is-detail');
 
   const footer = document.getElementById('modal-footer');
@@ -657,6 +677,46 @@ function openDetail(section, data) {
   if (targetId && (section !== 'notas_dm' || isDM())) {
     const el = document.getElementById(targetId);
     if (el) el.innerHTML = data.contenido_html || '<em>Sin contenido</em>';
+  }
+
+  // Cargar notas de jugadores si aplica
+  if (ENTITY_NOTES_SECTIONS.has(section) && data._sbid) {
+    loadEntityNote(section, data._sbid);
+  }
+}
+
+function toggleEntityNotes() {
+  const body = document.getElementById('entity-notes-body');
+  const arrow = document.getElementById('en-arrow');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  arrow.textContent = open ? '▸' : '▾';
+}
+
+async function loadEntityNote(entityType, entityId) {
+  const editor = document.getElementById('entity-notes-editor');
+  if (!editor) return;
+  try {
+    const text = await sbLoadEntityNote(entityType, entityId);
+    editor.innerHTML = textToContentEditable(text);
+    // Inicializar menciones en el editor
+    initMentionTextarea(editor);
+  } catch(e) {
+    console.warn('Error loading entity note:', e);
+  }
+}
+
+async function saveEntityNote() {
+  const editor = document.getElementById('entity-notes-editor');
+  const status = document.getElementById('en-status');
+  if (!editor || !currentModalData?._sbid) return;
+  const text = contentEditableToText(editor);
+  try {
+    await sbSaveEntityNote(currentModalSection, currentModalData._sbid, text);
+    if (status) { status.textContent = '✓ Guardado'; setTimeout(() => status.textContent = '', 2000); }
+  } catch(e) {
+    if (status) status.textContent = 'Error: ' + e.message;
   }
 }
 
