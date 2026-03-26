@@ -104,6 +104,13 @@
       </button>
       <div class="header-title" id="header-section-title"></div>
       <div class="header-actions">
+        <div id="global-search" class="global-search">
+          <button class="global-search-toggle" onclick="toggleGlobalSearch()" title="Buscar (Ctrl+K)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
+          <input type="text" id="global-search-input" class="global-search-input" placeholder="Buscar en todo..." autocomplete="off">
+          <div id="global-search-results" class="global-search-results"></div>
+        </div>
         <button class="btn dm-only btn-sm" onclick="recargarDatos()" title="Recargar datos">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
           <span>Recargar</span>

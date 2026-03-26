@@ -55,6 +55,7 @@ async function bootApp() {
   const titleEl = document.getElementById('header-section-title');
   if (titleEl) titleEl.textContent = 'Notas de Sesión';
   renderAll();
+  initGlobalSearch();
 }
 
 // ── GITHUB TOKEN ──────────────────────────────────────────
@@ -406,13 +407,155 @@ function insertMention(section, notionId, nombre) {
   mentionState = null;
 }
 
+// ── GLOBAL SEARCH ────────────────────────────────────────────────
+
+const SEARCH_SOURCES = [
+  { key: 'npcs',              tab: 'npcs',              label: 'NPC',             icon: '👤', fields: ['nombre','raza','primera_impresion'] },
+  { key: 'ciudades',          tab: 'ciudades',          label: 'Ciudad',          icon: '🏙', fields: ['nombre','descripcion','lider'] },
+  { key: 'establecimientos',  tab: 'establecimientos',  label: 'Establecimiento', icon: '🏪', fields: ['nombre','descripcion_interior','descripcion_exterior'] },
+  { key: 'lugares',           tab: 'lugares',           label: 'Lugar',           icon: '🗺', fields: ['nombre','descripcion'] },
+  { key: 'items',             tab: 'items',             label: 'Item',            icon: '⚔', fields: ['nombre','descripcion'] },
+  { key: 'quests',            tab: 'quests',            label: 'Quest',           icon: '★', fields: ['nombre','resumen'] },
+  { key: 'players',           tab: 'personajes',        label: 'Personaje',       icon: '🎭', fields: ['nombre','descripcion'] },
+  { key: 'notas_jugadores',   tab: 'notas_jugadores',   label: 'Nota',            icon: '📓', fields: ['nombre','resumen'] },
+];
+
+function globalSearch(query) {
+  const q = query.toLowerCase();
+  const results = [];
+  const dm = isDM();
+  for (const src of SEARCH_SOURCES) {
+    // DM-only sources
+    if (src.key === 'notas_dm' && !dm) continue;
+    const arr = DATA[src.key] || [];
+    for (const item of arr) {
+      // Visibilidad: jugadores solo ven lo que tienen acceso
+      if (!dm && src.key !== 'players' && src.key !== 'notas_jugadores') {
+        if (!item.conocida_jugadores && !item.conocido_jugadores && !item.creado_por_jugador) continue;
+      }
+      const match = src.fields.some(f => {
+        const val = item[f];
+        return val && stripMentions(String(val)).toLowerCase().includes(q);
+      });
+      if (!match) continue;
+      // Extraer snippet del campo que matcheó
+      let snippet = '';
+      for (const f of src.fields) {
+        const val = item[f];
+        if (val && stripMentions(String(val)).toLowerCase().includes(q)) {
+          snippet = stripMentions(String(val)).substring(0, 80);
+          break;
+        }
+      }
+      results.push({ section: src.tab, notionId: item.notion_id, nombre: item.nombre, icon: src.icon, label: src.label, snippet });
+      if (results.length >= 25) return results;
+    }
+  }
+  return results;
+}
+
+function toggleGlobalSearch() {
+  const container = document.getElementById('global-search');
+  const input = document.getElementById('global-search-input');
+  container.classList.toggle('open');
+  if (container.classList.contains('open')) {
+    input.value = '';
+    input.focus();
+    document.getElementById('global-search-results').classList.remove('open');
+  }
+}
+
+function initGlobalSearch() {
+  const input = document.getElementById('global-search-input');
+  const results = document.getElementById('global-search-results');
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim();
+    if (q.length < 2) { results.classList.remove('open'); return; }
+    const items = globalSearch(q);
+    if (!items.length) {
+      results.innerHTML = '<div class="gs-empty">Sin resultados</div>';
+      results.classList.add('open');
+      return;
+    }
+    results.innerHTML = items.map((r, i) =>
+      `<div class="gs-option${i === 0 ? ' active' : ''}" data-section="${r.section}" data-id="${r.notionId}">
+        <span class="gs-icon">${r.icon}</span>
+        <div class="gs-info">
+          <div class="gs-name">${escapeHtml(r.nombre)}</div>
+          ${r.snippet && r.snippet !== r.nombre ? `<div class="gs-snippet">${escapeHtml(r.snippet).substring(0,60)}${r.snippet.length > 60 ? '…' : ''}</div>` : ''}
+        </div>
+        <span class="gs-type">${r.label}</span>
+      </div>`
+    ).join('');
+    results.classList.add('open');
+
+    results.querySelectorAll('.gs-option').forEach(opt => {
+      opt.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        openGlobalSearchResult(opt.dataset.section, opt.dataset.id);
+      });
+    });
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (!results.classList.contains('open')) return;
+    const opts = [...results.querySelectorAll('.gs-option')];
+    const activeIdx = opts.findIndex(o => o.classList.contains('active'));
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      opts[activeIdx]?.classList.remove('active');
+      opts[(activeIdx + 1) % opts.length]?.classList.add('active');
+      opts[(activeIdx + 1) % opts.length]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      opts[activeIdx]?.classList.remove('active');
+      opts[(activeIdx - 1 + opts.length) % opts.length]?.classList.add('active');
+      opts[(activeIdx - 1 + opts.length) % opts.length]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      const active = results.querySelector('.gs-option.active');
+      if (active) {
+        e.preventDefault();
+        openGlobalSearchResult(active.dataset.section, active.dataset.id);
+      }
+    } else if (e.key === 'Escape') {
+      toggleGlobalSearch();
+    }
+  });
+
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      results.classList.remove('open');
+    }, 200);
+  });
+
+  // Ctrl+K / Cmd+K atajo global
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      toggleGlobalSearch();
+    }
+  });
+}
+
+function openGlobalSearchResult(section, notionId) {
+  const dataKey = section === 'personajes' ? 'players' : section;
+  const arr = DATA[dataKey] || [];
+  const item = arr.find(x => x.notion_id === notionId);
+  if (item) {
+    document.getElementById('global-search').classList.remove('open');
+    document.getElementById('global-search-results').classList.remove('open');
+    openDetail(section, item);
+  }
+}
+
 // ── RELATION CHIP (clickeable + hover preview) ───────────────────
-function relChip(tab, notionId, nombre, onCard = false) {
+function relChip(tab, notionId, nombre) {
   if (!nombre) return '—';
   const safe = escapeHtml(nombre);
   if (!notionId) return safe;
-  const cls = onCard ? 'rel-chip' : 'rel-link';
-  return `<span class="${cls}" onclick="event.stopPropagation();navegarA('${tab}','${notionId}')" onmouseenter="showPreview('${tab}','${notionId}',event)" onmouseleave="hidePreview()">${safe}</span>`;
+  return `<span class="rel-chip" onclick="event.stopPropagation();navegarA('${tab}','${notionId}')" onmouseenter="showPreview('${tab}','${notionId}',event)" onmouseleave="hidePreview()">${safe}</span>`;
 }
 
 function showPreview(tab, notionId, event) {
@@ -874,9 +1017,9 @@ function renderQuests() {
         </div>
       </div>
       <div class="card-body">
-        ${(q.quest_npcs && q.quest_npcs.length) ? `<div class="card-meta"><span class="meta-label">NPCs:</span> ${q.quest_npcs.map(n => relChip('npcs', n.notion_id, n.nombre, true)).join(' ')}</div>` : ''}
-        ${(q.lugares && q.lugares.length) ? `<div class="card-meta"><span class="meta-label">Lugares:</span> ${q.lugares.map(l => relChip('lugares', l.notion_id, l.nombre, true)).join(' ')}</div>` : ''}
-        ${(q.ciudades && q.ciudades.length) ? `<div class="card-meta"><span class="meta-label">Ciudades:</span> ${q.ciudades.map(c => relChip('ciudades', c.notion_id, c.nombre, true)).join(' ')}</div>` : ''}
+        ${(q.quest_npcs && q.quest_npcs.length) ? `<div class="card-meta"><span class="meta-label">NPCs:</span> ${q.quest_npcs.map(n => relChip('npcs', n.notion_id, n.nombre)).join(' ')}</div>` : ''}
+        ${(q.lugares && q.lugares.length) ? `<div class="card-meta"><span class="meta-label">Lugares:</span> ${q.lugares.map(l => relChip('lugares', l.notion_id, l.nombre)).join(' ')}</div>` : ''}
+        ${(q.ciudades && q.ciudades.length) ? `<div class="card-meta"><span class="meta-label">Ciudades:</span> ${q.ciudades.map(c => relChip('ciudades', c.notion_id, c.nombre)).join(' ')}</div>` : ''}
         ${q.resumen ? `<div class="card-desc">${escapeHtml(stripMentions(q.resumen)).substring(0,150)}${q.resumen.length > 150 ? '\u2026' : ''}</div>` : ''}
       </div>
     </div>`;
@@ -909,8 +1052,8 @@ function renderCiudades() {
           ${c.poblacion ? `<span class="meta-item"><span class="meta-label">Pob.:</span> ${c.poblacion.toLocaleString()}</span>` : ''}
         </div>
         ${c.descripcion ? `<div class="card-desc">${escapeHtml(stripMentions(c.descripcion))}</div>` : ''}
-        ${cEstabs.length ? `<div style="margin-top:8px"><div style="font-family:'Cinzel',serif;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.1em;margin-bottom:4px">ESTABLECIMIENTOS</div><div style="display:flex;flex-wrap:wrap;gap:4px">${cEstabs.map(e => relChip('establecimientos', e.notion_id, e.nombre, true)).join('')}</div></div>` : ''}
-        ${cNpcs.length ? `<div style="margin-top:8px"><div style="font-family:'Cinzel',serif;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.1em;margin-bottom:4px">NPCS</div><div style="display:flex;flex-wrap:wrap;gap:4px">${cNpcs.map(n => relChip('npcs', n.notion_id, n.nombre, true)).join('')}</div></div>` : ''}
+        ${cEstabs.length ? `<div style="margin-top:8px"><div style="font-family:'Cinzel',serif;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.1em;margin-bottom:4px">ESTABLECIMIENTOS</div><div style="display:flex;flex-wrap:wrap;gap:4px">${cEstabs.map(e => relChip('establecimientos', e.notion_id, e.nombre)).join('')}</div></div>` : ''}
+        ${cNpcs.length ? `<div style="margin-top:8px"><div style="font-family:'Cinzel',serif;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.1em;margin-bottom:4px">NPCS</div><div style="display:flex;flex-wrap:wrap;gap:4px">${cNpcs.map(n => relChip('npcs', n.notion_id, n.nombre)).join('')}</div></div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -962,12 +1105,12 @@ function renderEstablecimientosGrid() {
           <div class="card-title">${escapeHtml(e.nombre)}</div>
           <div class="card-meta" style="margin-top:5px">
             <span class="badge tipo-badge">${val(e.tipo)}</span>
-            ${e.ciudad ? relChip('ciudades', e.ciudad.notion_id, e.ciudad.nombre, true) : ''}
+            ${e.ciudad ? relChip('ciudades', e.ciudad.notion_id, e.ciudad.nombre) : ''}
           </div>
         </div>
       </div>
       <div class="card-body">
-        ${e.dueno ? `<div class="card-meta"><span class="meta-item"><span class="meta-label">Due\u00f1o:</span> ${relChip('npcs', e.dueno.notion_id, e.dueno.nombre, true)}</span></div>` : ''}
+        ${e.dueno ? `<div class="card-meta"><span class="meta-item"><span class="meta-label">Due\u00f1o:</span> ${relChip('npcs', e.dueno.notion_id, e.dueno.nombre)}</span></div>` : ''}
         ${e.descripcion_interior ? `<div class="card-desc">${escapeHtml(stripMentions(e.descripcion_interior))}</div>` : ''}
       </div>
     </div>`).join('');
@@ -1075,8 +1218,8 @@ function renderNPCsGrid() {
       <div class="card-body">
         <div class="card-meta">
           ${n.raza ? `<span class="meta-item"><span class="meta-label">Raza:</span> ${escapeHtml(n.raza)}</span>` : ''}
-          ${n.ciudad ? `<span class="meta-item"><span class="meta-label">Ciudad:</span> ${relChip('ciudades', n.ciudad.notion_id, n.ciudad.nombre, true)}</span>` : ''}
-          ${n.establecimiento ? `<span class="meta-item"><span class="meta-label">Lugar:</span> ${relChip('establecimientos', n.establecimiento.notion_id, n.establecimiento.nombre, true)}</span>` : ''}
+          ${n.ciudad ? `<span class="meta-item"><span class="meta-label">Ciudad:</span> ${relChip('ciudades', n.ciudad.notion_id, n.ciudad.nombre)}</span>` : ''}
+          ${n.establecimiento ? `<span class="meta-item"><span class="meta-label">Lugar:</span> ${relChip('establecimientos', n.establecimiento.notion_id, n.establecimiento.nombre)}</span>` : ''}
         </div>
         ${n.primera_impresion ? `<div class="card-desc">${escapeHtml(stripMentions(n.primera_impresion)).substring(0,120)}${n.primera_impresion.length > 120 ? '\u2026' : ''}</div>` : ''}
       </div>
@@ -1134,7 +1277,7 @@ function renderItemsGrid() {
       </div>
       <div class="card-body">
         <div class="card-meta">
-          ${it.personaje ? `<span class="meta-item"><span class="meta-label">Portador:</span> ${relChip('personajes', it.personaje.notion_id, it.personaje.nombre, true)}</span>` : '<span class="meta-item" style="color:var(--text-dim)">Sin portador</span>'}
+          ${it.personaje ? `<span class="meta-item"><span class="meta-label">Portador:</span> ${relChip('personajes', it.personaje.notion_id, it.personaje.nombre)}</span>` : '<span class="meta-item" style="color:var(--text-dim)">Sin portador</span>'}
           ${it.requiere_sintonizacion ? `<span class="badge badge-rare" style="font-size:0.58rem">Attunement</span>` : ''}
         </div>
       </div>
