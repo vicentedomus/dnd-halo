@@ -252,16 +252,14 @@ function hidePreview() {
 
 // ── NAVIGATE TO CARD ─────────────────────────────────────────────
 function navegarA(tab, notionId) {
-  closeModal();
-  switchTab(tab);
   if (!notionId) return;
-  setTimeout(() => {
-    const card = document.querySelector(`[data-notion-id="${notionId}"]`);
-    if (!card) return;
-    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    card.classList.add('card-highlight');
-    setTimeout(() => card.classList.remove('card-highlight'), 2000);
-  }, 120);
+  // Buscar el item en DATA y abrir su detalle en popup
+  const dataKey = tab === 'personajes' ? 'players' : tab;
+  const arr = DATA[dataKey] || [];
+  const item = arr.find(x => x.notion_id === notionId);
+  if (item) {
+    openDetail(tab, item);
+  }
 }
 
 // ── DETAIL MODAL ────────────────────────────────────────────────
