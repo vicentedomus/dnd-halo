@@ -2651,3 +2651,154 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .fullscreen-util-panel { padding: 12px 12px; }
   .fullscreen-util-title { font-size: 1.1rem; }
 }
+
+/* ============================================================
+   D&D BEYOND CHARACTER SHEET (experimental)
+   ============================================================ */
+.ddb-toggle-bar {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;
+}
+.ddb-toggle-btn {
+  background: rgba(26,107,191,0.15); border: 1px solid rgba(26,107,191,0.4);
+  color: #6db3f8; font-family: 'Cinzel', serif;
+}
+.ddb-toggle-btn:hover { background: rgba(26,107,191,0.3); }
+.ddb-container { margin-top: 8px; }
+.ddb-loading { text-align: center; padding: 24px 0; }
+.ddb-error {
+  background: rgba(139,0,0,0.15); border: 1px solid rgba(139,0,0,0.4);
+  border-radius: 6px; padding: 12px 16px; color: var(--text-primary);
+}
+
+/* Sheet layout */
+.ddb-sheet {
+  background: rgba(0,0,0,0.2); border: 1px solid var(--border-gold-dark);
+  border-radius: 8px; padding: 16px; font-family: 'IM Fell English', serif;
+}
+.ddb-header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.ddb-avatar {
+  width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--border-gold);
+  object-fit: cover; flex-shrink: 0;
+}
+.ddb-identity { flex: 1; min-width: 0; }
+.ddb-name {
+  font-family: 'Pirata One', cursive; font-size: 1.3rem; color: var(--text-primary);
+  line-height: 1.1;
+}
+.ddb-subtitle { font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px; }
+.ddb-level {
+  display: inline-block; margin-top: 4px; padding: 1px 8px;
+  background: rgba(200,169,110,0.15); border: 1px solid var(--border-gold-dark);
+  border-radius: 10px; font-size: 0.7rem; font-family: 'Cinzel', serif;
+  color: var(--border-gold); letter-spacing: 0.05em;
+}
+
+/* Core stats row */
+.ddb-core-stats {
+  display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.ddb-stat-block {
+  flex: 1; min-width: 60px; text-align: center;
+  background: var(--panel); border: 1px solid var(--border-gold-dark);
+  border-radius: 6px; padding: 6px 4px;
+}
+.ddb-stat-label {
+  font-family: 'Cinzel', serif; font-size: 0.6rem; font-weight: 700;
+  color: var(--text-dim); letter-spacing: 0.12em; text-transform: uppercase;
+}
+.ddb-stat-value { font-size: 1.1rem; font-weight: bold; color: var(--text-primary); margin-top: 2px; }
+.ddb-ac { color: var(--border-gold-bright); }
+.ddb-speed { font-size: 0.8rem; }
+
+/* HP bar */
+.ddb-hp-bar {
+  position: relative; height: 22px; background: rgba(0,0,0,0.4);
+  border-radius: 4px; overflow: hidden; margin-top: 4px;
+}
+.ddb-hp-fill {
+  position: absolute; left: 0; top: 0; height: 100%;
+  border-radius: 4px; transition: width 0.3s;
+}
+.ddb-hp-text {
+  position: relative; z-index: 1; display: flex; align-items: center; justify-content: center;
+  height: 100%; font-size: 0.75rem; font-weight: bold; color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+/* Ability scores */
+.ddb-abilities {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 14px;
+}
+.ddb-ability {
+  text-align: center; background: var(--panel); border: 1px solid var(--border-gold-dark);
+  border-radius: 6px; padding: 6px 2px;
+}
+.ddb-ability-name {
+  font-family: 'Cinzel', serif; font-size: 0.6rem; font-weight: 700;
+  color: var(--text-dim); letter-spacing: 0.1em;
+}
+.ddb-ability-mod { font-size: 1.1rem; font-weight: bold; color: var(--text-primary); }
+.ddb-ability-score { font-size: 0.65rem; color: var(--text-dim); }
+
+/* Spell slots */
+.ddb-slots {
+  display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;
+  padding: 8px; background: var(--panel); border: 1px solid var(--border-gold-dark);
+  border-radius: 6px;
+}
+.ddb-slot-group { display: flex; align-items: center; gap: 3px; }
+.ddb-slot-label {
+  font-family: 'Cinzel', serif; font-size: 0.6rem; font-weight: 700;
+  color: var(--text-dim); width: 14px; text-align: center;
+}
+.ddb-slot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--blue); border: 1px solid rgba(26,107,191,0.6);
+}
+.ddb-slot-used { background: rgba(0,0,0,0.3); border-color: var(--border-gold-dark); }
+
+/* Sections */
+.ddb-section { margin-bottom: 12px; }
+.ddb-section-title {
+  font-family: 'Cinzel', serif; font-size: 0.7rem; font-weight: 700;
+  color: var(--text-dim); letter-spacing: 0.12em; text-transform: uppercase;
+  margin-bottom: 6px; border-bottom: 1px solid rgba(139,105,20,0.3); padding-bottom: 4px;
+}
+
+/* Equipment */
+.ddb-equip-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+.ddb-equip-item {
+  display: inline-block; padding: 2px 8px; font-size: 0.78rem;
+  background: rgba(200,169,110,0.08); border: 1px solid var(--border-gold-dark);
+  border-radius: 4px; color: var(--text-secondary);
+}
+.ddb-equip-item.ddb-magic {
+  border-color: var(--purple); color: #b88aef;
+  background: rgba(122,53,204,0.1);
+}
+
+/* Spells */
+.ddb-spell-level { margin-bottom: 8px; }
+.ddb-spell-level-title {
+  font-family: 'Cinzel', serif; font-size: 0.65rem; font-weight: 600;
+  color: var(--text-dim); margin-bottom: 3px;
+}
+.ddb-spell-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.ddb-spell {
+  display: inline-block; padding: 1px 6px; font-size: 0.75rem;
+  background: rgba(200,169,110,0.06); border: 1px solid rgba(139,105,20,0.25);
+  border-radius: 3px; color: var(--text-dim);
+}
+.ddb-spell.ddb-prepared { color: var(--text-secondary); border-color: var(--border-gold-dark); }
+.ddb-spell-tag { font-size: 0.6rem; color: var(--blue); font-style: italic; }
+
+/* Coins */
+.ddb-coins { font-size: 0.85rem; color: var(--border-gold); }
+.ddb-empty { font-size: 0.8rem; color: var(--text-dim); font-style: italic; }
+
+/* Responsive */
+@media (max-width: 500px) {
+  .ddb-abilities { grid-template-columns: repeat(3, 1fr); }
+  .ddb-core-stats { flex-wrap: wrap; }
+  .ddb-stat-block { min-width: 45%; }
+}
