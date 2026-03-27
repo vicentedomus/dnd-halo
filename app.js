@@ -53,8 +53,9 @@ async function bootApp() {
 
   await loadData();
   const titleEl = document.getElementById('header-section-title');
-  if (titleEl) titleEl.textContent = 'Notas de Sesión';
+  if (titleEl) titleEl.textContent = 'Campaña';
   renderAll();
+  renderCampana();
   initGlobalSearch();
 }
 
@@ -80,7 +81,7 @@ function closeSidebar() {
 }
 
 // ── TAB SWITCHING ───────────────────────────────────────────────
-const TAB_TITLES = { notas:'Notas de Sesión', npcs:'NPCs', establecimientos:'Establecimientos', ciudades:'Ciudades', lugares:'Lugares', items:'Items Mágicos', personajes:'Personajes', quests:'Quests', mapa:'Mapa', utilidades:'Utilidades' };
+const TAB_TITLES = { campana:'Campaña', notas:'Notas de Sesión', npcs:'NPCs', establecimientos:'Establecimientos', ciudades:'Ciudades', lugares:'Lugares', items:'Items Mágicos', personajes:'Personajes', quests:'Quests', mapa:'Mapa', utilidades:'Utilidades' };
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === `section-${tab}`));
@@ -93,6 +94,7 @@ function switchTab(tab) {
   } else {
     content.classList.remove('map-active');
   }
+  if (tab === 'campana') renderCampana();
   if (tab === 'utilidades') renderUtilidades();
 }
 
@@ -1016,6 +1018,89 @@ function buildDetailHTML(section, data) {
     }
     default:
       return `<pre style="font-size:0.75rem;color:var(--text-dim)">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+  }
+}
+
+// ── RENDER CAMPAÑA (multi-columna) ──────────────────────────────────
+function renderCampana() {
+  const searchVal = (document.getElementById('campana-search')?.value || '').toLowerCase().trim();
+
+  const colDefs = [
+    {
+      key: 'npcs', dataKey: 'npcs',
+      visFilter: n => isDM() || n.conocido_jugadores,
+      render: n => `<div class="campana-mini" data-section="npcs" data-notion-id="${n.notion_id}" onclick="openDetailFromCard(this)">
+        <div class="campana-mini-name">${escapeHtml(n.nombre)}</div>
+        <div class="campana-mini-meta">${rolBadge(n.rol)} ${n.ciudad ? `<span class="campana-mini-dim">${escapeHtml(n.ciudad.nombre)}</span>` : ''}</div>
+      </div>`,
+      searchFields: ['nombre','raza','tipo_npc','primera_impresion']
+    },
+    {
+      key: 'ciudades', dataKey: 'ciudades',
+      visFilter: c => isDM() || c.conocida_jugadores,
+      render: c => `<div class="campana-mini" data-section="ciudades" data-notion-id="${c.notion_id}" onclick="openDetailFromCard(this)">
+        <div class="campana-mini-name">${escapeHtml(c.nombre)}</div>
+        <div class="campana-mini-meta">${c.estado ? `<span class="campana-mini-dim">${escapeHtml(c.estado)}</span>` : ''}${c.poblacion ? `<span class="campana-mini-dim">Pob. ${c.poblacion.toLocaleString()}</span>` : ''}</div>
+      </div>`,
+      searchFields: ['nombre','estado','lider']
+    },
+    {
+      key: 'lugares', dataKey: 'lugares',
+      visFilter: l => isDM() || l.conocido_jugadores || l.creado_por_jugador,
+      render: l => `<div class="campana-mini" data-section="lugares" data-notion-id="${l.notion_id}" onclick="openDetailFromCard(this)">
+        <div class="campana-mini-name">${escapeHtml(l.nombre)}</div>
+        <div class="campana-mini-meta">${l.tipo ? `<span class="badge tipo-badge" style="font-size:0.6rem">${escapeHtml(l.tipo)}</span>` : ''}${l.region ? `<span class="campana-mini-dim">${escapeHtml(l.region)}</span>` : ''}</div>
+      </div>`,
+      searchFields: ['nombre','tipo','region']
+    },
+    {
+      key: 'quests', dataKey: 'quests',
+      visFilter: q => isDM() || q.conocido_jugadores,
+      render: q => `<div class="campana-mini" data-section="quests" data-notion-id="${q.notion_id}" onclick="openDetailFromCard(this)">
+        <div class="campana-mini-name">${escapeHtml(q.nombre)}</div>
+        <div class="campana-mini-meta">${estadoQuestBadge(q.estado)}</div>
+      </div>`,
+      searchFields: ['nombre','resumen']
+    },
+    {
+      key: 'items', dataKey: 'items',
+      visFilter: i => isDM() || i.personaje !== null,
+      render: i => `<div class="campana-mini" data-section="items" data-notion-id="${i.notion_id}" onclick="openDetailFromCard(this)">
+        <div class="campana-mini-name">${escapeHtml(i.nombre)}</div>
+        <div class="campana-mini-meta">${i.rareza ? rarezaBadge(i.rareza) : ''}${i.tipo ? `<span class="badge tipo-badge" style="font-size:0.6rem">${escapeHtml(i.tipo)}</span>` : ''}</div>
+      </div>`,
+      searchFields: ['nombre','tipo','rareza']
+    },
+    {
+      key: 'establecimientos', dataKey: 'establecimientos',
+      visFilter: e => isDM() || e.conocido_jugadores,
+      render: e => `<div class="campana-mini" data-section="establecimientos" data-notion-id="${e.notion_id}" onclick="openDetailFromCard(this)">
+        <div class="campana-mini-name">${escapeHtml(e.nombre)}</div>
+        <div class="campana-mini-meta">${e.tipo ? `<span class="badge tipo-badge" style="font-size:0.6rem">${escapeHtml(e.tipo)}</span>` : ''}${e.ciudad ? `<span class="campana-mini-dim">${escapeHtml(e.ciudad.nombre)}</span>` : ''}</div>
+      </div>`,
+      searchFields: ['nombre','tipo']
+    }
+  ];
+
+  for (const col of colDefs) {
+    let items = DATA[col.dataKey] || [];
+    items = items.filter(col.visFilter);
+    if (searchVal) {
+      items = items.filter(item =>
+        col.searchFields.some(f => {
+          const v = item[f];
+          return v && String(v).toLowerCase().includes(searchVal);
+        })
+      );
+    }
+    const countEl = document.getElementById(`campana-count-${col.key}`);
+    if (countEl) countEl.textContent = items.length;
+    const listEl = document.getElementById(`campana-list-${col.key}`);
+    if (listEl) {
+      listEl.innerHTML = items.length
+        ? items.map(col.render).join('')
+        : `<div class="campana-empty">Sin registros</div>`;
+    }
   }
 }
 
