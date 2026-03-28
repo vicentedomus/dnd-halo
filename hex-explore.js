@@ -151,10 +151,57 @@ const HexExplore = (() => {
     return { roll: tirada, tipo: 'combate', resultado: 'Encuentro de combate (bioma desconocido)', bioma: null };
   }
 
+  // --- Multiplicadores de velocidad por bioma ---
+  const BIOME_SPEED_MULT = {
+    'Grassland':                  1,
+    'Temperate deciduous forest': 1.5,
+    'Temperate rainforest':       1.5,
+    'Tundra':                     1.5,
+    'Taiga':                      1.5,
+    'Wetland':                    2,
+    'Hot desert':                 2,
+    'Cold desert':                1.5,
+    'Volcano':                    2,
+    'Glacier':                    2,
+  };
+
+  const HEX_DISTANCE = 24; // millas por hex
+  const DEFAULT_SPEED = 24; // millas por dia (a pie, velocidad normal)
+
+  /**
+   * Calcula el tiempo de viaje para un hex.
+   * @param {string} svgBiome - Nombre del bioma SVG
+   * @param {number} speed - Velocidad en millas/dia
+   * @returns {{ days: number, hours: number, multiplier: number }}
+   */
+  function travelTime(svgBiome, speed) {
+    const mult = BIOME_SPEED_MULT[svgBiome] || 1;
+    const effectiveSpeed = speed || DEFAULT_SPEED;
+    const days = (HEX_DISTANCE / effectiveSpeed) * mult;
+    const fullDays = Math.floor(days);
+    const hours = Math.round((days - fullDays) * 24);
+    return { days, fullDays, hours, multiplier: mult };
+  }
+
+  /**
+   * Formatea el tiempo de viaje a texto legible.
+   */
+  function formatTravelTime(tt) {
+    if (tt.days <= 0) return 'instantáneo';
+    if (tt.fullDays === 0) return `${tt.hours}h`;
+    if (tt.hours === 0) return `${tt.fullDays} día${tt.fullDays > 1 ? 's' : ''}`;
+    return `${tt.fullDays}d ${tt.hours}h`;
+  }
+
   return {
     BIOME_MAP,
+    BIOME_SPEED_MULT,
+    HEX_DISTANCE,
+    DEFAULT_SPEED,
     TABLAS,
     explorar,
     svgBiomeToKey,
+    travelTime,
+    formatTravelTime,
   };
 })();

@@ -2833,6 +2833,7 @@ async function renderMapa() {
     renderMapMarkers();
     initMapToLegendHighlight();
     initFogBrushTools();
+    initPartySystem();
     mapLoaded = true;
   } catch(e) {
     viewport.innerHTML = `<div style="padding:40px;color:var(--text-dim);font-family:'Cinzel',serif;text-align:center">Error al cargar el mapa: ${e.message}</div>`;
@@ -3573,7 +3574,7 @@ async function recargarDatos() {
 // (poligonos blancos en la mascara), no los ocultos (~26k hexes).
 // =====================================================================
 
-// Estado del fog: { "q,r": { revealed: bool, discovered: bool } }
+// Estado del fog: { "q,r": { revealed: bool, discovered: bool, note: string } }
 // revealed = visible en el mapa (fog removido)
 // discovered = un explorador ha pasado por ahi (puede tener actividades)
 let FOG_DATA = {};
@@ -3594,6 +3595,94 @@ function saveFogData() {
     localStorage.setItem(FOG_STORAGE_KEY, JSON.stringify(FOG_DATA));
   } catch (e) {
     console.warn('[Fog] Error saving fog data:', e);
+  }
+}
+
+/** Carga fog desde Supabase y mergea con localStorage (Supabase gana). */
+async function loadFogFromSupabase() {
+  try {
+    const { data, error } = await sbClient.from('hex_fog').select('*');
+    if (error) { console.warn('[Fog] Supabase load error:', error.message); return; }
+    if (!data || !data.length) return;
+
+    for (const row of data) {
+      const key = row.hex_key;
+      if (!FOG_DATA[key]) FOG_DATA[key] = {};
+      FOG_DATA[key].revealed = row.revealed;
+      FOG_DATA[key].discovered = row.discovered;
+      if (row.note) FOG_DATA[key].note = row.note;
+    }
+    // Sincronizar localStorage con lo de Supabase
+    saveFogData();
+  } catch (e) {
+    console.warn('[Fog] Supabase load failed:', e);
+  }
+}
+
+/** Guarda cambios de fog en Supabase (batch upsert). */
+async function saveFogToSupabase(keys) {
+  if (!keys || !keys.length) return;
+  try {
+    const rows = keys.map(key => {
+      const d = FOG_DATA[key] || {};
+      return {
+        hex_key: key,
+        revealed: !!d.revealed,
+        discovered: !!d.discovered,
+        note: d.note || null,
+        updated_at: new Date().toISOString(),
+      };
+    });
+    const { error } = await sbClient.from('hex_fog').upsert(rows, { onConflict: 'hex_key' });
+    if (error) console.warn('[Fog] Supabase save error:', error.message);
+  } catch (e) {
+    console.warn('[Fog] Supabase save failed:', e);
+  }
+}
+
+/** Guarda una nota de hex en Supabase. */
+async function saveNoteToSupabase(q, r) {
+  const key = HexGrid.hexKey(q, r);
+  const d = FOG_DATA[key] || {};
+  try {
+    await sbClient.from('hex_fog').upsert({
+      hex_key: key,
+      revealed: !!d.revealed,
+      discovered: !!d.discovered,
+      note: d.note || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'hex_key' });
+  } catch (e) {
+    console.warn('[Fog] Note save failed:', e);
+  }
+}
+
+/** Guarda una entrada en el log de exploración. */
+async function logExploration(tipo, titulo, descripcion, hexKey, bioma, roll) {
+  // Guardar en Supabase
+  try {
+    await sbClient.from('exploration_log').insert({
+      tipo, titulo,
+      descripcion: descripcion || null,
+      hex_key: hexKey || null,
+      bioma: bioma || null,
+      roll: roll || null,
+    });
+  } catch (e) {
+    console.warn('[Fog] Log save failed:', e);
+  }
+}
+
+/** Carga el log de exploración desde Supabase. */
+async function loadExplorationLog() {
+  try {
+    const { data, error } = await sbClient.from('exploration_log')
+      .select('*').order('created_at', { ascending: false }).limit(50);
+    if (error) { console.warn('[Fog] Log load error:', error.message); return []; }
+    return data || [];
+  } catch (e) {
+    console.warn('[Fog] Log load failed:', e);
+    return [];
   }
 }
 
@@ -3627,6 +3716,7 @@ function setHexNote(q, r, note) {
     delete FOG_DATA[key].note;
   }
   saveFogData();
+  saveNoteToSupabase(q, r);
 }
 
 function revealHex(q, r, save = true) {
@@ -3661,9 +3751,10 @@ function hideHexes(hexList) {
  * Inicializa la capa de fog en el SVG.
  * Crea un <rect> negro con mask, posicionado sobre el contenido del mapa.
  */
-function initFogLayer() {
+async function initFogLayer() {
   if (!mapSvgEl || typeof HexGrid === 'undefined') return;
   loadFogData();
+  await loadFogFromSupabase();
 
   const ns = 'http://www.w3.org/2000/svg';
   const defs = mapSvgEl.querySelector('defs');
@@ -4088,18 +4179,21 @@ function triggerExploration(revealedKeys) {
   if (newRegions.size > 0) {
     for (const region of newRegions) {
       discoveredRegions.add(region);
+      logExploration('region', region, null, newHexKeys[0], biomeForEncounter, null);
     }
     saveDiscoveredRegions();
-    // Mostrar banner de la primera region nueva
     const firstRegion = [...newRegions][0];
     showRegionBanner(firstRegion);
   }
+
+  // Guardar hexes descubiertos en Supabase
+  saveFogToSupabase(newHexKeys);
 
   // Encuentro aleatorio
   if (biomeForEncounter) {
     const result = HexExplore.explorar(biomeForEncounter);
     if (result.tipo !== 'nada') {
-      // Esperar a que el banner termine si hay uno
+      logExploration(result.tipo, result.tipo, result.resultado, newHexKeys[0], biomeForEncounter, result.roll);
       const delay = newRegions.size > 0 ? 3500 : 200;
       setTimeout(() => showEncounterToast(result), delay);
     }
@@ -4161,6 +4255,530 @@ function showEncounterToast(result) {
 
   // Auto-cerrar despues de 12 segundos
   setTimeout(() => toast.classList.remove('encounter-toast-show'), 12000);
+}
+
+// =====================================================================
+// EXPLORATION LOG — Diario de exploracion
+// Panel con historial de descubrimientos, visible para todos.
+// =====================================================================
+
+let explorationLogOpen = false;
+
+function toggleExplorationLog() {
+  explorationLogOpen = !explorationLogOpen;
+  const panel = document.getElementById('exploration-log-panel');
+  const btn = document.getElementById('btn-exploration-log');
+  if (panel) panel.style.display = explorationLogOpen ? '' : 'none';
+  if (btn) btn.classList.toggle('active', explorationLogOpen);
+  if (explorationLogOpen) renderExplorationLog();
+}
+
+async function renderExplorationLog() {
+  const list = document.getElementById('exploration-log-list');
+  if (!list) return;
+  list.innerHTML = '<div style="text-align:center;color:var(--on-surface-variant);padding:12px">Cargando...</div>';
+
+  const entries = await loadExplorationLog();
+  if (!entries.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--on-surface-variant);padding:12px">Sin descubrimientos aún.</div>';
+    return;
+  }
+
+  const icons = { region: '🏔', clima: '⛈', social: '🗣', combate: '⚔', viaje: '🚶' };
+  const labels = { region: 'Región', clima: 'Clima', social: 'Social', combate: 'Combate', viaje: 'Viaje' };
+
+  list.innerHTML = entries.map(e => {
+    const icon = icons[e.tipo] || '❓';
+    const label = labels[e.tipo] || e.tipo;
+    const date = new Date(e.created_at);
+    const time = date.toLocaleDateString('es', { day: 'numeric', month: 'short' }) + ' ' +
+                 date.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+    return `
+      <div class="exploration-log-entry">
+        <div class="exploration-log-entry-header">
+          <span class="exploration-log-icon">${icon}</span>
+          <span class="exploration-log-label">${label}</span>
+          ${e.roll ? `<span class="exploration-log-roll">d100: ${e.roll}</span>` : ''}
+          <span class="exploration-log-time">${time}</span>
+        </div>
+        <div class="exploration-log-title">${e.titulo}</div>
+        ${e.descripcion ? `<div class="exploration-log-desc">${e.descripcion}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+// =====================================================================
+// PARTY TOKEN — Sistema de movimiento del grupo
+// Marcador draggeable + modo viaje con waypoints + pathfinding.
+// =====================================================================
+
+let partyPosition = null; // { q, r }
+let partyMoveMode = false;
+let partySpeed = 24;
+let partyRevealRadius = 1;
+let partyTotalDays = 0;
+let partyWaypoints = []; // [{ q, r }] — waypoints del viaje planeado
+let partyPath = [];      // [{ q, r }] — path completo calculado (hex a hex)
+let partyDragging = false;
+const PARTY_STORAGE_KEY = 'halo_party';
+
+function loadPartyData() {
+  try {
+    const stored = localStorage.getItem(PARTY_STORAGE_KEY);
+    if (stored) {
+      const d = JSON.parse(stored);
+      partyPosition = d.position || null;
+      partySpeed = d.speed || 24;
+      partyRevealRadius = d.revealRadius ?? 1;
+      partyTotalDays = d.totalDays || 0;
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function savePartyData() {
+  try {
+    localStorage.setItem(PARTY_STORAGE_KEY, JSON.stringify({
+      position: partyPosition,
+      speed: partySpeed,
+      revealRadius: partyRevealRadius,
+      totalDays: partyTotalDays,
+    }));
+  } catch (e) { /* ignore */ }
+}
+
+/**
+ * Renderiza el marcador del party en el SVG (siempre visible, draggeable).
+ */
+function renderPartyToken() {
+  if (!mapSvgEl || !partyPosition) return;
+  const ns = 'http://www.w3.org/2000/svg';
+
+  let g = mapSvgEl.querySelector('#party-token');
+  if (!g) {
+    g = document.createElementNS(ns, 'g');
+    g.setAttribute('id', 'party-token');
+    g.style.cursor = 'grab';
+    mapSvgEl.appendChild(g);
+  }
+
+  const center = HexGrid.hexCenter(partyPosition.q, partyPosition.r);
+  g.innerHTML = '';
+
+  const circle = document.createElementNS(ns, 'circle');
+  circle.setAttribute('cx', center.x);
+  circle.setAttribute('cy', center.y);
+  circle.setAttribute('r', '2.8');
+  circle.setAttribute('fill', '#ffbf00');
+  circle.setAttribute('stroke', '#000');
+  circle.setAttribute('stroke-width', '0.5');
+  circle.setAttribute('filter', 'drop-shadow(0 0 2px rgba(255,191,0,0.8))');
+  g.appendChild(circle);
+
+  const icon = document.createElementNS(ns, 'text');
+  icon.setAttribute('x', center.x);
+  icon.setAttribute('y', center.y + 0.6);
+  icon.setAttribute('text-anchor', 'middle');
+  icon.setAttribute('dominant-baseline', 'middle');
+  icon.setAttribute('fill', '#000');
+  icon.setAttribute('font-size', '2.8');
+  icon.textContent = '⚑';
+  g.appendChild(icon);
+}
+
+function initPartyDrag() {
+  if (!mapSvgEl) return;
+  const g = mapSvgEl.querySelector('#party-token');
+  if (!g) return;
+
+  g.addEventListener('mousedown', (e) => {
+    if (partyMoveMode) return; // No drag en modo viaje
+    e.stopPropagation();
+    e.preventDefault();
+    partyDragging = true;
+    g.style.cursor = 'grabbing';
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!partyDragging) return;
+    const svgPt = screenToSvg(e.clientX, e.clientY);
+    const hex = HexGrid.svgToHex(svgPt.x, svgPt.y);
+    partyPosition = { q: hex.q, r: hex.r };
+    renderPartyToken();
+    initPartyDrag(); // Re-bind drag a nuevo g
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!partyDragging) return;
+    partyDragging = false;
+    const g2 = mapSvgEl.querySelector('#party-token');
+    if (g2) g2.style.cursor = 'grab';
+    savePartyData();
+  });
+}
+
+// --- Pathfinding: BFS camino más corto entre dos hexes ---
+
+function hexBFS(startQ, startR, endQ, endR) {
+  const startKey = HexGrid.hexKey(startQ, startR);
+  const endKey = HexGrid.hexKey(endQ, endR);
+  if (startKey === endKey) return [{ q: startQ, r: startR }];
+
+  const visited = new Set([startKey]);
+  const parent = {};
+  const queue = [{ q: startQ, r: startR }];
+
+  while (queue.length) {
+    const cur = queue.shift();
+    const neighbors = HexGrid.hexNeighbors(cur.q, cur.r);
+    for (const n of neighbors) {
+      const nk = HexGrid.hexKey(n.q, n.r);
+      if (visited.has(nk)) continue;
+      visited.add(nk);
+      parent[nk] = HexGrid.hexKey(cur.q, cur.r);
+      if (nk === endKey) {
+        // Reconstruir path
+        const path = [{ q: endQ, r: endR }];
+        let k = nk;
+        while (parent[k]) {
+          const p = HexGrid.parseHexKey(parent[k]);
+          path.unshift(p);
+          k = parent[k];
+        }
+        return path;
+      }
+      queue.push(n);
+    }
+  }
+  return []; // no path found
+}
+
+/**
+ * Calcula el path completo a partir de party position + waypoints.
+ */
+function computePartyPath() {
+  if (!partyPosition) { partyPath = []; return; }
+  if (!partyWaypoints.length) { partyPath = []; return; }
+
+  const points = [partyPosition, ...partyWaypoints];
+  const fullPath = [points[0]];
+
+  for (let i = 1; i < points.length; i++) {
+    const segment = hexBFS(points[i - 1].q, points[i - 1].r, points[i].q, points[i].r);
+    // Skip first hex of segment (it's the end of previous segment)
+    for (let j = 1; j < segment.length; j++) {
+      fullPath.push(segment[j]);
+    }
+  }
+
+  partyPath = fullPath;
+}
+
+/**
+ * Renderiza el path planeado y waypoints en el SVG.
+ */
+function renderPartyPath() {
+  if (!mapSvgEl) return;
+  const ns = 'http://www.w3.org/2000/svg';
+
+  let g = mapSvgEl.querySelector('#party-path-layer');
+  if (!g) {
+    g = document.createElementNS(ns, 'g');
+    g.setAttribute('id', 'party-path-layer');
+    g.style.pointerEvents = 'none';
+    mapSvgEl.appendChild(g);
+  }
+  g.innerHTML = '';
+
+  if (!partyPath.length) return;
+
+  // Dibujar hexes del path (skip el primero, que es la posición actual)
+  for (let i = 1; i < partyPath.length; i++) {
+    const h = partyPath[i];
+    const poly = document.createElementNS(ns, 'polygon');
+    poly.setAttribute('points', HexGrid.hexPolygonPoints(h.q, h.r));
+    poly.setAttribute('fill', 'rgba(255, 191, 0, 0.2)');
+    poly.setAttribute('stroke', '#ffbf00');
+    poly.setAttribute('stroke-width', '0.2');
+    g.appendChild(poly);
+  }
+
+  // Linea de path (centro a centro)
+  if (partyPath.length >= 2) {
+    const line = document.createElementNS(ns, 'polyline');
+    const pts = partyPath.map(h => {
+      const c = HexGrid.hexCenter(h.q, h.r);
+      return `${c.x},${c.y}`;
+    }).join(' ');
+    line.setAttribute('points', pts);
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', '#ffbf00');
+    line.setAttribute('stroke-width', '0.4');
+    line.setAttribute('stroke-dasharray', '1,0.5');
+    line.setAttribute('opacity', '0.7');
+    g.appendChild(line);
+  }
+
+  // Waypoints (diamantes)
+  for (const wp of partyWaypoints) {
+    const c = HexGrid.hexCenter(wp.q, wp.r);
+    const diamond = document.createElementNS(ns, 'rect');
+    diamond.setAttribute('x', c.x - 1);
+    diamond.setAttribute('y', c.y - 1);
+    diamond.setAttribute('width', '2');
+    diamond.setAttribute('height', '2');
+    diamond.setAttribute('fill', '#ff6b35');
+    diamond.setAttribute('stroke', '#000');
+    diamond.setAttribute('stroke-width', '0.3');
+    diamond.setAttribute('transform', `rotate(45 ${c.x} ${c.y})`);
+    g.appendChild(diamond);
+  }
+}
+
+/**
+ * Calcula el resumen del viaje planeado.
+ */
+function computeTravelSummary() {
+  if (partyPath.length < 2) return null;
+
+  let totalDays = 0;
+  const biomes = {};
+
+  for (let i = 1; i < partyPath.length; i++) {
+    const h = partyPath[i];
+    const ctx = detectHexContext(h.q, h.r);
+    const tt = HexExplore.travelTime(ctx.biome, partySpeed);
+    totalDays += tt.days;
+    const bName = ctx.biome || 'Desconocido';
+    biomes[bName] = (biomes[bName] || 0) + 1;
+  }
+
+  return {
+    hexCount: partyPath.length - 1,
+    totalDays,
+    biomes,
+  };
+}
+
+function updatePartyPanel() {
+  const summary = computeTravelSummary();
+  const summaryEl = document.getElementById('party-travel-summary');
+  const travelBtn = document.getElementById('btn-party-travel');
+  const cancelBtn = document.getElementById('btn-party-cancel');
+
+  if (!summaryEl) return;
+
+  if (!summary) {
+    summaryEl.innerHTML = '<span style="color:var(--on-surface-variant)">Click en el mapa para agregar destino</span>';
+    if (travelBtn) travelBtn.style.display = 'none';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    return;
+  }
+
+  const biomeSummary = Object.entries(summary.biomes)
+    .map(([name, count]) => `${name} (${count})`)
+    .join(', ');
+
+  summaryEl.innerHTML = `
+    <div><strong>${summary.hexCount}</strong> hexes — <strong>${HexExplore.formatTravelTime({ days: summary.totalDays, fullDays: Math.floor(summary.totalDays), hours: Math.round((summary.totalDays - Math.floor(summary.totalDays)) * 24) })}</strong></div>
+    <div style="font-size:0.7rem;color:var(--on-surface-variant);margin-top:2px">${biomeSummary}</div>
+  `;
+  if (travelBtn) travelBtn.style.display = '';
+  if (cancelBtn) cancelBtn.style.display = '';
+}
+
+function addWaypoint(q, r) {
+  // No agregar si es la posicion actual o el ultimo waypoint
+  const last = partyWaypoints.length ? partyWaypoints[partyWaypoints.length - 1] : partyPosition;
+  if (last && last.q === q && last.r === r) return;
+
+  partyWaypoints.push({ q, r });
+  computePartyPath();
+  renderPartyPath();
+  updatePartyPanel();
+}
+
+function removeWaypoint(idx) {
+  partyWaypoints.splice(idx, 1);
+  computePartyPath();
+  renderPartyPath();
+  updatePartyPanel();
+}
+
+function cancelTravel() {
+  partyWaypoints = [];
+  partyPath = [];
+  renderPartyPath();
+  updatePartyPanel();
+}
+
+/**
+ * Ejecuta el viaje planeado hex por hex.
+ */
+function executeTravel() {
+  if (partyPath.length < 2) return;
+
+  const pathToTravel = partyPath.slice(1); // skip posicion actual
+  const allRevealedKeys = [];
+
+  for (const h of pathToTravel) {
+    // Calcular tiempo
+    const ctx = detectHexContext(h.q, h.r);
+    const tt = HexExplore.travelTime(ctx.biome, partySpeed);
+    partyTotalDays += tt.days;
+
+    // Mover party
+    partyPosition = { q: h.q, r: h.r };
+
+    // Revelar fog en radio
+    const hexesToReveal = HexGrid.hexesInRadius(h.q, h.r, partyRevealRadius);
+    for (const rh of hexesToReveal) {
+      if (!isHexRevealed(rh.q, rh.r)) {
+        revealHex(rh.q, rh.r, false);
+        allRevealedKeys.push(HexGrid.hexKey(rh.q, rh.r));
+      }
+    }
+  }
+
+  // Guardar todo
+  saveFogData();
+  savePartyData();
+  if (allRevealedKeys.length) {
+    saveFogToSupabase(allRevealedKeys);
+  }
+  renderFog();
+  renderPartyToken();
+  initPartyDrag();
+
+  // Log del viaje completo
+  const summary = computeTravelSummary();
+  if (summary) {
+    const ttTotal = { days: summary.totalDays, fullDays: Math.floor(summary.totalDays), hours: Math.round((summary.totalDays - Math.floor(summary.totalDays)) * 24) };
+    logExploration('viaje', `Viaje de ${summary.hexCount} hexes`,
+      `${HexExplore.formatTravelTime(ttTotal)} — Día ${Math.ceil(partyTotalDays)}`,
+      HexGrid.hexKey(partyPosition.q, partyPosition.r), null, null);
+  }
+
+  // Limpiar path
+  partyWaypoints = [];
+  partyPath = [];
+  renderPartyPath();
+  updatePartyPanel();
+
+  // Actualizar dia en panel
+  const dayEl = document.getElementById('party-day-count');
+  if (dayEl) dayEl.textContent = Math.ceil(partyTotalDays) || 1;
+
+  // Trigger exploracion para hexes nuevos
+  if (allRevealedKeys.length) {
+    triggerExploration(allRevealedKeys);
+  }
+}
+
+function togglePartyMoveMode() {
+  partyMoveMode = !partyMoveMode;
+  const btn = document.getElementById('btn-party-move');
+  if (btn) btn.classList.toggle('active', partyMoveMode);
+
+  const panel = document.getElementById('party-panel');
+  if (panel) panel.style.display = partyMoveMode ? '' : 'none';
+
+  if (!partyMoveMode) {
+    cancelTravel();
+    if (mapSvgEl) mapSvgEl.style.cursor = '';
+  } else {
+    if (mapSvgEl) mapSvgEl.style.cursor = 'crosshair';
+  }
+}
+
+function initPartySystem() {
+  if (!mapSvgEl || typeof HexGrid === 'undefined') return;
+  if (!isDM()) return;
+
+  loadPartyData();
+  if (partyPosition) {
+    renderPartyToken();
+    initPartyDrag();
+  }
+
+  // Panel del party
+  const wrapper = document.querySelector('.map-wrapper');
+  if (wrapper && !document.getElementById('party-panel')) {
+    const panel = document.createElement('div');
+    panel.id = 'party-panel';
+    panel.className = 'party-panel';
+    panel.style.display = 'none';
+    panel.innerHTML = `
+      <div class="fog-brush-title">Party</div>
+      <div class="fog-brush-row">
+        <label class="hex-radius-label">
+          Velocidad <span id="party-speed-value">${partySpeed}</span> mi/d
+          <input type="range" id="party-speed-slider" min="6" max="96" value="${partySpeed}" step="6"
+            oninput="partySpeed=+this.value;document.getElementById('party-speed-value').textContent=this.value;savePartyData()">
+        </label>
+      </div>
+      <div class="fog-brush-row">
+        <label class="hex-radius-label">
+          Radio <span id="party-radius-value">${partyRevealRadius}</span>
+          <input type="range" id="party-radius-slider" min="0" max="3" value="${partyRevealRadius}"
+            oninput="partyRevealRadius=+this.value;document.getElementById('party-radius-value').textContent=this.value;savePartyData()">
+        </label>
+      </div>
+      <div class="fog-brush-row">
+        <span class="travel-day-counter">Día <span id="party-day-count">${Math.ceil(partyTotalDays) || 1}</span></span>
+        <button class="fog-action-btn" onclick="partyTotalDays=0;savePartyData();document.getElementById('party-day-count').textContent='1'" title="Resetear contador">↺</button>
+      </div>
+      <div class="party-travel-summary" id="party-travel-summary">
+        <span style="color:var(--on-surface-variant)">Click en el mapa para agregar destino</span>
+      </div>
+      <div class="fog-brush-row" style="margin-top:6px">
+        <button class="fog-action-btn fog-apply" id="btn-party-travel" onclick="executeTravel()" style="display:none;flex:1">Viajar</button>
+        <button class="fog-action-btn fog-discard" id="btn-party-cancel" onclick="cancelTravel()" style="display:none;flex:1">Cancelar</button>
+      </div>
+    `;
+    wrapper.appendChild(panel);
+  }
+
+  // Boton en zoom controls
+  const zoomControls = document.querySelector('.map-zoom-controls');
+  if (zoomControls && !document.getElementById('btn-party-move')) {
+    const btn = document.createElement('button');
+    btn.id = 'btn-party-move';
+    btn.className = 'map-zoom-btn map-marker-btn';
+    btn.title = 'Modo viaje';
+    btn.onclick = togglePartyMoveMode;
+    btn.innerHTML = '⚑';
+    btn.style.fontSize = '14px';
+    zoomControls.insertBefore(btn, zoomControls.firstChild);
+  }
+
+  // Click para agregar waypoint (modo viaje)
+  mapSvgEl.addEventListener('click', (e) => {
+    if (!partyMoveMode) return;
+    if (!partyPosition) {
+      // Colocar party por primera vez
+      const svgPt = screenToSvg(e.clientX, e.clientY);
+      const hex = HexGrid.svgToHex(svgPt.x, svgPt.y);
+      partyPosition = { q: hex.q, r: hex.r };
+      savePartyData();
+      renderPartyToken();
+      initPartyDrag();
+      e.stopPropagation();
+      return;
+    }
+    e.stopPropagation();
+    const svgPt = screenToSvg(e.clientX, e.clientY);
+    const hex = HexGrid.svgToHex(svgPt.x, svgPt.y);
+    addWaypoint(hex.q, hex.r);
+  });
+
+  // Click derecho para quitar ultimo waypoint
+  mapSvgEl.addEventListener('contextmenu', (e) => {
+    if (!partyMoveMode || !partyWaypoints.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    removeWaypoint(partyWaypoints.length - 1);
+  });
 }
 
 // =====================================================================
@@ -4267,6 +4885,7 @@ function applyFogChanges() {
   if (!Object.keys(fogPendingChanges).length) return;
 
   // Detectar nuevas regiones descubiertas (para banner)
+  const allChangedKeys = Object.keys(fogPendingChanges);
   const revealedKeys = [];
   for (const [key, action] of Object.entries(fogPendingChanges)) {
     const { q, r } = HexGrid.parseHexKey(key);
@@ -4278,6 +4897,7 @@ function applyFogChanges() {
     }
   }
   saveFogData();
+  saveFogToSupabase(allChangedKeys); // async, no-blocking
   fogPendingChanges = {};
   renderFog();
   renderFogPreview();
@@ -4349,17 +4969,30 @@ function initFogBrushTools() {
     wrapper.appendChild(panel);
   }
 
-  // Boton toggle en zoom controls
+  // Botones en zoom controls
   const zoomControls = document.querySelector('.map-zoom-controls');
   if (zoomControls && !document.getElementById('btn-fog-brush')) {
-    const btn = document.createElement('button');
-    btn.id = 'btn-fog-brush';
-    btn.className = 'map-zoom-btn map-marker-btn';
-    btn.title = 'Herramientas de niebla';
-    btn.onclick = toggleFogBrush;
-    btn.innerHTML = '⬡';
-    btn.style.fontSize = '18px';
-    zoomControls.insertBefore(btn, zoomControls.firstChild);
+    // Boton log de exploracion
+    const logBtn = document.createElement('button');
+    logBtn.id = 'btn-exploration-log';
+    logBtn.className = 'map-zoom-btn map-marker-btn';
+    logBtn.title = 'Diario de exploración';
+    logBtn.onclick = toggleExplorationLog;
+    logBtn.innerHTML = '📜';
+    logBtn.style.fontSize = '14px';
+    zoomControls.insertBefore(logBtn, zoomControls.firstChild);
+
+    // Boton fog brush (solo DM)
+    if (isDM()) {
+      const btn = document.createElement('button');
+      btn.id = 'btn-fog-brush';
+      btn.className = 'map-zoom-btn map-marker-btn';
+      btn.title = 'Herramientas de niebla';
+      btn.onclick = toggleFogBrush;
+      btn.innerHTML = '⬡';
+      btn.style.fontSize = '18px';
+      zoomControls.insertBefore(btn, zoomControls.firstChild);
+    }
   }
 
   // --- Interaccion: hover highlight ---
