@@ -333,11 +333,6 @@ async function applyChange(cardId) {
         .single();
       if (error) throw new Error(error.message);
 
-      // Set notion_id = id for new records
-      await sbClient.from(sbTable)
-        .update({ notion_id: created.id })
-        .eq('id', created.id);
-
       // Save for undo (delete on undo)
       undoStack.set(cardId, {
         table: change.table,
@@ -346,7 +341,7 @@ async function applyChange(cardId) {
       });
 
       // Add to local DATA
-      const norm = { ...change.fields, _sbid: created.id, notion_id: created.id };
+      const norm = { ...change.fields, _sbid: created.id, id: created.id };
       if (!DATA[change.table]) DATA[change.table] = [];
       DATA[change.table].push(norm);
     }

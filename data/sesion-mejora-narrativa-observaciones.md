@@ -180,7 +180,7 @@
 ### Patrón para la skill
 - Leer entidad de Supabase via REST API (service role key)
 - Proponer mejora → aprobación del DM → escribir de vuelta via PATCH
-- Para NPCs nuevos (como líder de ciudad): POST a /rest/v1/npcs + asignar notion_id = UUID generado
+- Para NPCs nuevos (como líder de ciudad): POST a /rest/v1/npcs
 
 ---
 

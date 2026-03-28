@@ -5,7 +5,7 @@
 
 // ── DATA STORE ────────────────────────────────────────────
 const DATA = {};
-let MAP_MARKERS = {}; // {notion_id: {x, y}}
+let MAP_MARKERS = {}; // {id: {x, y}}
 let currentModalSection = null;
 let currentModalData = null;
 let currentModalMode = null; // 'detail' | 'edit'
@@ -120,15 +120,15 @@ function val(v, fallback='—') {
 const EYE_OPEN = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 4.5C7 4.5 2.7 7.6 1 12c1.7 4.4 6 7.5 11 7.5s9.3-3.1 11-7.5c-1.7-4.4-6-7.5-11-7.5zm0 12.5c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5zm0-8c-1.7 0-3 1.3-3 3s1.3 3 3 3 3-1.3 3-3-1.3-3-3-3z"/></svg>';
 const EYE_CLOSED = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 7c2.8 0 5 2.2 5 5 0 .7-.1 1.3-.4 1.9l2.9 2.9c1.5-1.3 2.7-3 3.4-4.8-1.7-4.4-6-7.5-11-7.5-1.4 0-2.7.3-4 .7l2.2 2.2c.6-.3 1.2-.4 1.9-.4zM2 4.3l2.3 2.3.4.4C3.1 8.3 1.9 10 1.1 12c1.7 4.4 6 7.5 11 7.5 1.5 0 3-.3 4.4-.8l.4.4 3 3 1.3-1.3L3.3 3 2 4.3zm5.5 5.5l1.6 1.6c0 .2-.1.4-.1.6 0 1.7 1.3 3 3 3 .2 0 .4 0 .6-.1l1.6 1.6c-.7.3-1.4.5-2.2.5-2.8 0-5-2.2-5-5 0-.8.2-1.5.5-2.2z"/></svg>';
 
-function visibilityToggleHtml(entity, notionId, isVisible) {
+function visibilityToggleHtml(entity, entityId, isVisible) {
   if (!isDM()) return '';
-  return `<span class="visibility-toggle ${isVisible ? 'is-visible' : ''}" onclick="event.stopPropagation(); toggleVisibility('${entity}', '${notionId}', this)" title="${isVisible ? 'Visible para jugadores' : 'Oculto para jugadores'}">${isVisible ? EYE_OPEN : EYE_CLOSED}</span>`;
+  return `<span class="visibility-toggle ${isVisible ? 'is-visible' : ''}" onclick="event.stopPropagation(); toggleVisibility('${entity}', '${entityId}', this)" title="${isVisible ? 'Visible para jugadores' : 'Oculto para jugadores'}">${isVisible ? EYE_OPEN : EYE_CLOSED}</span>`;
 }
 
-async function toggleVisibility(entity, notionId, iconEl) {
+async function toggleVisibility(entity, entityId, iconEl) {
   const dataKey = entity;
   const arr = DATA[dataKey] || [];
-  const item = arr.find(x => x.notion_id === notionId);
+  const item = arr.find(x => x.id === entityId);
   if (!item) return;
 
   // Determinar el campo correcto
@@ -222,7 +222,7 @@ function getMentionResults(query) {
     for (const item of arr) {
       if (!item.nombre) continue;
       if (q && !item.nombre.toLowerCase().includes(q)) continue;
-      results.push({ section: src.tab || src.key, notionId: item.notion_id, nombre: item.nombre, icon: src.icon, label: src.label });
+      results.push({ section: src.tab || src.key, entityId: item.id, nombre: item.nombre, icon: src.icon, label: src.label });
     }
     if (results.length > 50) break;
   }
@@ -231,8 +231,8 @@ function getMentionResults(query) {
 
 /** Parsea texto con @menciones y devuelve HTML con links clickeables */
 function parseMentions(escapedHtml) {
-  return escapedHtml.replace(/@\[([^\]]+)\]\(([^:]+):([^)]+)\)/g, (_, nombre, section, notionId) => {
-    return `<span class="mention-link" onclick="event.stopPropagation();navegarA('${section}','${notionId}')" onmouseenter="showPreview('${section}','${notionId}',event)" onmouseleave="hidePreview()">${nombre}</span>`;
+  return escapedHtml.replace(/@\[([^\]]+)\]\(([^:]+):([^)]+)\)/g, (_, nombre, section, entityId) => {
+    return `<span class="mention-link" onclick="event.stopPropagation();navegarA('${section}','${entityId}')" onmouseenter="showPreview('${section}','${entityId}',event)" onmouseleave="hidePreview()">${nombre}</span>`;
   });
 }
 
@@ -246,8 +246,8 @@ function stripMentions(text) {
 function textToContentEditable(text) {
   if (!text) return '';
   return escapeHtml(text)
-    .replace(/@\[([^\]]+)\]\(([^:]+):([^)]+)\)/g, (_, nombre, section, notionId) => {
-      return `<span class="ce-mention" contenteditable="false" data-section="${section}" data-id="${notionId}">${nombre}</span>`;
+    .replace(/@\[([^\]]+)\]\(([^:]+):([^)]+)\)/g, (_, nombre, section, entityId) => {
+      return `<span class="ce-mention" contenteditable="false" data-section="${section}" data-id="${entityId}">${nombre}</span>`;
     })
     .replace(/\n/g, '<br>');
 }
@@ -338,7 +338,7 @@ function onMentionInput(ceDiv, dropdown) {
 
   mentionState = { ceDiv, dropdown, atIdx, queryLen: query.length };
   dropdown.innerHTML = results.map((r, i) =>
-    `<div class="mention-option${i === 0 ? ' active' : ''}" data-idx="${i}" data-section="${r.section}" data-id="${r.notionId}" data-nombre="${escapeHtml(r.nombre)}">${r.icon} <strong>${escapeHtml(r.nombre)}</strong> <span class="mention-type">${r.label}</span></div>`
+    `<div class="mention-option${i === 0 ? ' active' : ''}" data-idx="${i}" data-section="${r.section}" data-id="${r.entityId}" data-nombre="${escapeHtml(r.nombre)}">${r.icon} <strong>${escapeHtml(r.nombre)}</strong> <span class="mention-type">${r.label}</span></div>`
   ).join('');
   dropdown.classList.add('open');
 
@@ -375,7 +375,7 @@ function onMentionKeydown(e, ceDiv, dropdown) {
   }
 }
 
-function insertMention(section, notionId, nombre) {
+function insertMention(section, entityId, nombre) {
   if (!mentionState) return;
   const { ceDiv, dropdown, queryLen } = mentionState;
 
@@ -392,7 +392,7 @@ function insertMention(section, notionId, nombre) {
   chip.className = 'ce-mention';
   chip.contentEditable = 'false';
   chip.dataset.section = section;
-  chip.dataset.id = notionId;
+  chip.dataset.id = entityId;
   chip.textContent = nombre;
   range.insertNode(chip);
 
@@ -449,7 +449,7 @@ function globalSearch(query) {
           break;
         }
       }
-      results.push({ section: src.tab, notionId: item.notion_id, nombre: item.nombre, icon: src.icon, label: src.label, snippet });
+      results.push({ section: src.tab, entityId: item.id, nombre: item.nombre, icon: src.icon, label: src.label, snippet });
       if (results.length >= 25) return results;
     }
   }
@@ -481,7 +481,7 @@ function initGlobalSearch() {
       return;
     }
     results.innerHTML = items.map((r, i) =>
-      `<div class="gs-option${i === 0 ? ' active' : ''}" data-section="${r.section}" data-id="${r.notionId}">
+      `<div class="gs-option${i === 0 ? ' active' : ''}" data-section="${r.section}" data-id="${r.entityId}">
         <span class="gs-icon">${r.icon}</span>
         <div class="gs-info">
           <div class="gs-name">${escapeHtml(r.nombre)}</div>
@@ -541,10 +541,10 @@ function initGlobalSearch() {
   });
 }
 
-function openGlobalSearchResult(section, notionId) {
+function openGlobalSearchResult(section, entityId) {
   const dataKey = section === 'personajes' ? 'players' : section;
   const arr = DATA[dataKey] || [];
-  const item = arr.find(x => x.notion_id === notionId);
+  const item = arr.find(x => x.id === entityId);
   if (item) {
     document.getElementById('global-search').classList.remove('open');
     document.getElementById('global-search-results').classList.remove('open');
@@ -553,17 +553,17 @@ function openGlobalSearchResult(section, notionId) {
 }
 
 // ── RELATION CHIP (clickeable + hover preview) ───────────────────
-function relChip(tab, notionId, nombre) {
+function relChip(tab, entityId, nombre) {
   if (!nombre) return '—';
   const safe = escapeHtml(nombre);
-  if (!notionId) return safe;
-  return `<span class="rel-chip" onclick="event.stopPropagation();navegarA('${tab}','${notionId}')" onmouseenter="showPreview('${tab}','${notionId}',event)" onmouseleave="hidePreview()">${safe}</span>`;
+  if (!entityId) return safe;
+  return `<span class="rel-chip" onclick="event.stopPropagation();navegarA('${tab}','${entityId}')" onmouseenter="showPreview('${tab}','${entityId}',event)" onmouseleave="hidePreview()">${safe}</span>`;
 }
 
-function showPreview(tab, notionId, event) {
+function showPreview(tab, entityId, event) {
   const arrMap = { npcs: DATA.npcs, ciudades: DATA.ciudades, establecimientos: DATA.establecimientos, personajes: DATA.players, items: DATA.items, quests: DATA.quests, lugares: DATA.lugares, notas_dm: DATA.notas_dm };
   const arr = arrMap[tab] || [];
-  const rec = arr.find(x => x.notion_id === notionId);
+  const rec = arr.find(x => x.id === entityId);
   if (!rec) return;
 
   let html = `<div class="preview-title">${escapeHtml(rec.nombre)}</div>`;
@@ -605,12 +605,12 @@ function hidePreview() {
 }
 
 // ── NAVIGATE TO CARD ─────────────────────────────────────────────
-function navegarA(tab, notionId) {
-  if (!notionId) return;
+function navegarA(tab, entityId) {
+  if (!entityId) return;
   // Buscar el item en DATA y abrir su detalle en popup
   const dataKey = tab === 'personajes' ? 'players' : tab;
   const arr = DATA[dataKey] || [];
-  const item = arr.find(x => x.notion_id === notionId);
+  const item = arr.find(x => x.id === entityId);
   if (item) {
     openDetail(tab, item);
   }
@@ -619,7 +619,7 @@ function navegarA(tab, notionId) {
 // ── DETAIL MODAL ────────────────────────────────────────────────
 function openDetailFromCard(el) {
   const section = el.dataset.section;
-  const notionId = el.dataset.notionId;
+  const entityId = el.dataset.entityId;
   let arr;
   if (section === 'notas_dm') arr = DATA.notas_dm || [];
   else if (section === 'notas_jugadores') arr = DATA.notas_jugadores || [];
@@ -627,7 +627,7 @@ function openDetailFromCard(el) {
   else if (section === 'monstruos') arr = DATA.monstruos || [];
   else if (section === 'items_catalog') arr = DATA.items_catalog || [];
   else arr = DATA[section] || [];
-  const item = arr.find(x => x.notion_id === notionId);
+  const item = arr.find(x => x.id === entityId);
   if (item) openDetail(section, item);
 }
 
@@ -665,16 +665,16 @@ function openDetail(section, data) {
   const footer = document.getElementById('modal-footer');
   const isReadOnly = section === 'monstruos' || section === 'items_catalog';
   const canEdit = !isReadOnly && (isDM() || data.creado_por_jugador || section === 'notas_jugadores');
-  const canDelete = canEdit && data.notion_id;
+  const canDelete = canEdit && data.id;
   footer.innerHTML = `
-    ${canDelete ? `<button class="btn btn-danger" onclick="deleteRecord('${section}','${data.notion_id}')" style="margin-right:auto">Eliminar</button>` : ''}
+    ${canDelete ? `<button class="btn btn-danger" onclick="deleteRecord('${section}','${data.id}')" style="margin-right:auto">Eliminar</button>` : ''}
     <button class="btn" onclick="closeModal()">Cerrar</button>
     ${canEdit ? `<button class="btn btn-success" onclick="switchToEdit()">✎ Editar</button>` : ''}
   `;
 
   document.getElementById('modal-overlay').classList.add('open');
 
-  // Mostrar contenido HTML de notas (pre-migrado desde Notion)
+  // Mostrar contenido HTML de notas
   const targetId = section === 'notas_dm' ? 'session-prep-content' : section === 'notas_jugadores' ? 'nota-page-content' : null;
   if (targetId && (section !== 'notas_dm' || isDM())) {
     const el = document.getElementById(targetId);
@@ -762,14 +762,14 @@ function buildDetailHTML(section, data) {
         row('Estado', estadoBadge(n.estado)),
         row('Tipo', n.tipo_npc ? `<span class="badge tipo-badge">${escapeHtml(n.tipo_npc)}</span>` : ''),
         row('Raza', escapeHtml(n.raza)),
-        row('Ciudad', n.ciudad ? relChip('ciudades', n.ciudad.notion_id, n.ciudad.nombre) : ''),
-        row('Establecimiento', n.establecimiento ? relChip('establecimientos', n.establecimiento.notion_id, n.establecimiento.nombre) : ''),
+        row('Ciudad', n.ciudad ? relChip('ciudades', n.ciudad.id, n.ciudad.nombre) : ''),
+        row('Establecimiento', n.establecimiento ? relChip('establecimientos', n.establecimiento.id, n.establecimiento.nombre) : ''),
         n.edad ? row('Edad', `${n.edad} años`) : '',
         textBlock('Primera Impresi\u00f3n', n.primera_impresion),
         isDM() && n.notas_roleplay ? textBlock('Notas Roleplay (DM)', n.notas_roleplay) : '',
-        (n.quests && n.quests.length) ? row('Quests', n.quests.map(q => relChip('quests', q.notion_id, q.nombre)).join(' ')) : '',
-        (n.items_magicos && n.items_magicos.length) ? row('Items', n.items_magicos.map(i => relChip('items', i.notion_id, i.nombre)).join(' ')) : '',
-        (n.lugares && n.lugares.length) ? row('Lugares', n.lugares.map(l => relChip('lugares', l.notion_id, l.nombre)).join(' ')) : '',
+        (n.quests && n.quests.length) ? row('Quests', n.quests.map(q => relChip('quests', q.id, q.nombre)).join(' ')) : '',
+        (n.items_magicos && n.items_magicos.length) ? row('Items', n.items_magicos.map(i => relChip('items', i.id, i.nombre)).join(' ')) : '',
+        (n.lugares && n.lugares.length) ? row('Lugares', n.lugares.map(l => relChip('lugares', l.id, l.nombre)).join(' ')) : '',
       ].join('');
     }
     case 'personajes': {
@@ -801,7 +801,7 @@ function buildDetailHTML(section, data) {
         (p.ac !== null && p.ac !== undefined) ? row('AC', p.ac) : '',
         (p.hp_maximo !== null && p.hp_maximo !== undefined) ? row('HP M\u00e1x', p.hp_maximo) : '',
         textBlock('Descripci\u00f3n', p.descripcion),
-        (p.items_magicos && p.items_magicos.length) ? `<div class="detail-section"><div class="detail-label">Items M\u00e1gicos</div><ul class="card-list">${p.items_magicos.map(i => `<li>${relChip('items', i.notion_id, i.nombre)}</li>`).join('')}</ul></div>` : '',
+        (p.items_magicos && p.items_magicos.length) ? `<div class="detail-section"><div class="detail-label">Items M\u00e1gicos</div><ul class="card-list">${p.items_magicos.map(i => `<li>${relChip('items', i.id, i.nombre)}</li>`).join('')}</ul></div>` : '',
         ddbSection,
       ].join('');
     }
@@ -815,34 +815,34 @@ function buildDetailHTML(section, data) {
       return [
         row('Estado', estadoQuestBadge(q.estado)),
         q.recompensa_gp ? row('Recompensa', `<span class="quest-recompensa">&#9830; ${escapeHtml(q.recompensa_gp)} GP</span>`) : '',
-        qNpcs.length ? row('NPCs', qNpcs.map(n => relChip('npcs', n.notion_id, n.nombre)).join(' ')) : '',
-        qLugares.length ? row('Lugares', qLugares.map(l => relChip('lugares', l.notion_id, l.nombre)).join(' ')) : '',
-        qCiudades.length ? row('Ciudades', qCiudades.map(c => relChip('ciudades', c.notion_id, c.nombre)).join(' ')) : '',
-        qEstabs.length ? row('Establecimientos', qEstabs.map(e => relChip('establecimientos', e.notion_id, e.nombre)).join(' ')) : '',
+        qNpcs.length ? row('NPCs', qNpcs.map(n => relChip('npcs', n.id, n.nombre)).join(' ')) : '',
+        qLugares.length ? row('Lugares', qLugares.map(l => relChip('lugares', l.id, l.nombre)).join(' ')) : '',
+        qCiudades.length ? row('Ciudades', qCiudades.map(c => relChip('ciudades', c.id, c.nombre)).join(' ')) : '',
+        qEstabs.length ? row('Establecimientos', qEstabs.map(e => relChip('establecimientos', e.id, e.nombre)).join(' ')) : '',
         textBlock('Resumen', q.resumen),
-        isDM() && qNotas.length ? row('Notas DM', qNotas.map(n => relChip('notas_dm', n.notion_id, n.nombre)).join(' ')) : '',
+        isDM() && qNotas.length ? row('Notas DM', qNotas.map(n => relChip('notas_dm', n.id, n.nombre)).join(' ')) : '',
       ].join('');
     }
     case 'ciudades': {
       const c = data;
-      const cEstabs = (DATA.establecimientos || []).filter(e => e.ciudad && e.ciudad.notion_id === c.notion_id);
-      const cNpcs   = (DATA.npcs || []).filter(n => n.ciudad && n.ciudad.notion_id === c.notion_id);
+      const cEstabs = (DATA.establecimientos || []).filter(e => e.ciudad && e.ciudad.id === c.id);
+      const cNpcs   = (DATA.npcs || []).filter(n => n.ciudad && n.ciudad.id === c.id);
       return [
         row('Reino/Estado', escapeHtml(c.estado)),
         row('L\u00edder', escapeHtml(c.lider)),
         c.poblacion ? row('Poblaci\u00f3n', c.poblacion.toLocaleString()) : '',
         textBlock('Descripci\u00f3n', c.descripcion),
         (isDM() && c.descripcion_lider) ? textBlock('Descripci\u00f3n L\u00edder (DM)', c.descripcion_lider) : '',
-        cEstabs.length ? `<div class="detail-section"><div class="detail-label">Establecimientos</div><ul class="card-list">${cEstabs.map(e => `<li>${relChip('establecimientos', e.notion_id, e.nombre)}</li>`).join('')}</ul></div>` : '',
-        cNpcs.length ? `<div class="detail-section"><div class="detail-label">NPCs</div><ul class="card-list">${cNpcs.map(n => `<li>${relChip('npcs', n.notion_id, n.nombre)}</li>`).join('')}</ul></div>` : '',
+        cEstabs.length ? `<div class="detail-section"><div class="detail-label">Establecimientos</div><ul class="card-list">${cEstabs.map(e => `<li>${relChip('establecimientos', e.id, e.nombre)}</li>`).join('')}</ul></div>` : '',
+        cNpcs.length ? `<div class="detail-section"><div class="detail-label">NPCs</div><ul class="card-list">${cNpcs.map(n => `<li>${relChip('npcs', n.id, n.nombre)}</li>`).join('')}</ul></div>` : '',
       ].join('');
     }
     case 'establecimientos': {
       const e = data;
       return [
         row('Tipo', e.tipo ? `<span class="badge tipo-badge">${escapeHtml(e.tipo)}</span>` : ''),
-        row('Ciudad', e.ciudad ? relChip('ciudades', e.ciudad.notion_id, e.ciudad.nombre) : ''),
-        row('Due\u00f1o', e.dueno ? relChip('npcs', e.dueno.notion_id, e.dueno.nombre) : ''),
+        row('Ciudad', e.ciudad ? relChip('ciudades', e.ciudad.id, e.ciudad.nombre) : ''),
+        row('Due\u00f1o', e.dueno ? relChip('npcs', e.dueno.id, e.dueno.nombre) : ''),
         textBlock('Exterior', e.descripcion_exterior),
         textBlock('Interior', e.descripcion_interior),
       ].join('');
@@ -856,10 +856,10 @@ function buildDetailHTML(section, data) {
         row('Tipo', l.tipo ? `<span class="badge tipo-badge">${escapeHtml(l.tipo)}</span>` : ''),
         row('Regi\u00f3n', escapeHtml(l.region)),
         row('Exploraci\u00f3n', escapeHtml(l.estado_exploracion)),
-        row('Ciudad', l.ciudad?.nombre ? relChip('ciudades', l.ciudad.notion_id, l.ciudad.nombre) : ''),
-        npcsL.length ? row('NPCs', npcsL.map(n => relChip('npcs', n.notion_id, n.nombre)).join(' ')) : '',
-        itemsL.length ? row('Items', itemsL.map(i => relChip('items', i.notion_id, i.nombre)).join(' ')) : '',
-        questsL.length ? row('Quests', questsL.map(q => relChip('quests', q.notion_id, q.nombre)).join(' ')) : '',
+        row('Ciudad', l.ciudad?.nombre ? relChip('ciudades', l.ciudad.id, l.ciudad.nombre) : ''),
+        npcsL.length ? row('NPCs', npcsL.map(n => relChip('npcs', n.id, n.nombre)).join(' ')) : '',
+        itemsL.length ? row('Items', itemsL.map(i => relChip('items', i.id, i.nombre)).join(' ')) : '',
+        questsL.length ? row('Quests', questsL.map(q => relChip('quests', q.id, q.nombre)).join(' ')) : '',
         textBlock('Descripci\u00f3n', l.descripcion),
       ].join('');
     }
@@ -869,8 +869,8 @@ function buildDetailHTML(section, data) {
         row('Rareza', rarezaBadge(it.rareza)),
         row('Tipo', it.tipo ? `<span class="badge tipo-badge">${escapeHtml(it.tipo)}</span>` : ''),
         row('Attunement', it.requiere_sintonizacion ? '\u2713 S\u00ed' : 'No'),
-        row('Portador', it.personaje?.nombre ? relChip('personajes', it.personaje.notion_id, it.personaje.nombre) : '<span style="color:var(--text-dim)">Sin portador</span>'),
-        it.npc_portador?.nombre ? row('NPC Portador', relChip('npcs', it.npc_portador.notion_id, it.npc_portador.nombre)) : '',
+        row('Portador', it.personaje?.nombre ? relChip('personajes', it.personaje.id, it.personaje.nombre) : '<span style="color:var(--text-dim)">Sin portador</span>'),
+        it.npc_portador?.nombre ? row('NPC Portador', relChip('npcs', it.npc_portador.id, it.npc_portador.nombre)) : '',
         row('Fuente', escapeHtml(it.fuente)),
         textBlock('Descripci\u00f3n', it.descripcion),
       ].join('');
@@ -883,7 +883,7 @@ function buildDetailHTML(section, data) {
       return [
         n.fecha ? row('Fecha', escapeHtml(n.fecha)) : '',
         jugadores.length ? row('Jugadores', jugadores.map(j => `<span class="player-chip">${escapeHtml(typeof j === 'string' ? j : j.nombre)}</span>`).join(' ')) : '',
-        quests.length ? row('Quests', quests.map(q => relChip('quests', q.notion_id, q.nombre)).join(' ')) : '',
+        quests.length ? row('Quests', quests.map(q => relChip('quests', q.id, q.nombre)).join(' ')) : '',
         textBlock('Resumen', n.resumen),
         isDM() ? `<div class="detail-section detail-section-prep" id="session-prep-container"><div class="detail-label-prep">&#9876; Session Prep</div><div class="detail-text detail-text-prep" id="session-prep-content"><em>Cargando...</em></div></div>` : '',
       ].join('');
@@ -896,7 +896,7 @@ function buildDetailHTML(section, data) {
       return [
         n.fecha ? row('Fecha', escapeHtml(n.fecha)) : '',
         jugador.length ? row('Jugador', jugador.map(j => `<span class="player-chip">${escapeHtml(typeof j === 'string' ? j : j.nombre)}</span>`).join(' ')) : '',
-        items.length ? row('Items', items.map(i => relChip('items', i.notion_id, i.nombre)).join(' ')) : '',
+        items.length ? row('Items', items.map(i => relChip('items', i.id, i.nombre)).join(' ')) : '',
         textBlock('Resumen', n.resumen),
         `<div class="detail-section" id="nota-content-container"><div class="detail-label">Contenido</div><div class="detail-text" id="nota-page-content"><em>Cargando...</em></div></div>`,
       ].join('');
@@ -1024,54 +1024,54 @@ function buildDetailHTML(section, data) {
 // ── RENDER CAMPAÑA (multi-columna) ──────────────────────────────────
 
 // Estado persistente de la pestaña Campaña
-let campanaSelected = null;  // { section, notion_id }
+let campanaSelected = null;  // { section, id }
 let campanaColOrder = null;  // ['npcs','ciudades',...] — se inicializa en primer render
 let campanaVisibleCols = null; // Set de keys visibles — se inicializa desde localStorage
 
 // Mapa de relaciones: dado un tipo+id, qué IDs de otras entidades están relacionados
-function campanaGetRelatedIds(section, notionId) {
+function campanaGetRelatedIds(section, entityId) {
   const related = {}; // { npcs: Set, ciudades: Set, ... }
-  const id = notionId;
+  const id = entityId;
 
   if (section === 'ciudades') {
-    related.npcs = new Set((DATA.npcs || []).filter(n => n.ciudad?.notion_id === id).map(n => n.notion_id));
-    related.establecimientos = new Set((DATA.establecimientos || []).filter(e => e.ciudad?.notion_id === id).map(e => e.notion_id));
-    related.lugares = new Set((DATA.lugares || []).filter(l => l.ciudad?.notion_id === id).map(l => l.notion_id));
-    related.quests = new Set((DATA.quests || []).filter(q => (q.ciudades || []).some(c => c.notion_id === id)).map(q => q.notion_id));
+    related.npcs = new Set((DATA.npcs || []).filter(n => n.ciudad?.id === id).map(n => n.id));
+    related.establecimientos = new Set((DATA.establecimientos || []).filter(e => e.ciudad?.id === id).map(e => e.id));
+    related.lugares = new Set((DATA.lugares || []).filter(l => l.ciudad?.id === id).map(l => l.id));
+    related.quests = new Set((DATA.quests || []).filter(q => (q.ciudades || []).some(c => c.id === id)).map(q => q.id));
     related.items = new Set();
   } else if (section === 'npcs') {
-    const npc = (DATA.npcs || []).find(n => n.notion_id === id);
-    related.ciudades = new Set(npc?.ciudad ? [npc.ciudad.notion_id] : []);
-    related.establecimientos = new Set(npc?.establecimiento ? [npc.establecimiento.notion_id] : []);
-    related.lugares = new Set((npc?.lugares || []).map(l => l.notion_id));
-    related.quests = new Set((npc?.quests || []).map(q => q.notion_id));
-    related.items = new Set((npc?.items_magicos || []).map(i => i.notion_id));
+    const npc = (DATA.npcs || []).find(n => n.id === id);
+    related.ciudades = new Set(npc?.ciudad ? [npc.ciudad.id] : []);
+    related.establecimientos = new Set(npc?.establecimiento ? [npc.establecimiento.id] : []);
+    related.lugares = new Set((npc?.lugares || []).map(l => l.id));
+    related.quests = new Set((npc?.quests || []).map(q => q.id));
+    related.items = new Set((npc?.items_magicos || []).map(i => i.id));
   } else if (section === 'establecimientos') {
-    const est = (DATA.establecimientos || []).find(e => e.notion_id === id);
-    related.ciudades = new Set(est?.ciudad ? [est.ciudad.notion_id] : []);
-    related.npcs = new Set(est?.dueno ? [est.dueno.notion_id] : []);
+    const est = (DATA.establecimientos || []).find(e => e.id === id);
+    related.ciudades = new Set(est?.ciudad ? [est.ciudad.id] : []);
+    related.npcs = new Set(est?.dueno ? [est.dueno.id] : []);
     // También NPCs que están en este establecimiento
-    (DATA.npcs || []).forEach(n => { if (n.establecimiento?.notion_id === id) (related.npcs || (related.npcs = new Set())).add(n.notion_id); });
+    (DATA.npcs || []).forEach(n => { if (n.establecimiento?.id === id) (related.npcs || (related.npcs = new Set())).add(n.id); });
     related.lugares = new Set();
-    related.quests = new Set((DATA.quests || []).filter(q => (q.establecimientos || []).some(e => e.notion_id === id)).map(q => q.notion_id));
+    related.quests = new Set((DATA.quests || []).filter(q => (q.establecimientos || []).some(e => e.id === id)).map(q => q.id));
     related.items = new Set();
   } else if (section === 'lugares') {
-    const lug = (DATA.lugares || []).find(l => l.notion_id === id);
-    related.ciudades = new Set(lug?.ciudad ? [lug.ciudad.notion_id] : []);
-    related.npcs = new Set((lug?.npcs || []).map(n => n.notion_id));
+    const lug = (DATA.lugares || []).find(l => l.id === id);
+    related.ciudades = new Set(lug?.ciudad ? [lug.ciudad.id] : []);
+    related.npcs = new Set((lug?.npcs || []).map(n => n.id));
     related.establecimientos = new Set();
-    related.quests = new Set((lug?.quests || []).map(q => q.notion_id));
-    related.items = new Set((lug?.items_magicos || []).map(i => i.notion_id));
+    related.quests = new Set((lug?.quests || []).map(q => q.id));
+    related.items = new Set((lug?.items_magicos || []).map(i => i.id));
   } else if (section === 'quests') {
-    const q = (DATA.quests || []).find(q => q.notion_id === id);
-    related.npcs = new Set((q?.quest_npcs || []).map(n => n.notion_id));
-    related.ciudades = new Set((q?.ciudades || []).map(c => c.notion_id));
-    related.lugares = new Set((q?.lugares || []).map(l => l.notion_id));
-    related.establecimientos = new Set((q?.establecimientos || []).map(e => e.notion_id));
+    const q = (DATA.quests || []).find(q => q.id === id);
+    related.npcs = new Set((q?.quest_npcs || []).map(n => n.id));
+    related.ciudades = new Set((q?.ciudades || []).map(c => c.id));
+    related.lugares = new Set((q?.lugares || []).map(l => l.id));
+    related.establecimientos = new Set((q?.establecimientos || []).map(e => e.id));
     related.items = new Set();
   } else if (section === 'items') {
-    const item = (DATA.items || []).find(i => i.notion_id === id);
-    related.npcs = new Set(item?.npc_portador ? [item.npc_portador.notion_id] : []);
+    const item = (DATA.items || []).find(i => i.id === id);
+    related.npcs = new Set(item?.npc_portador ? [item.npc_portador.id] : []);
     related.ciudades = new Set();
     related.lugares = new Set();
     related.quests = new Set();
@@ -1080,12 +1080,12 @@ function campanaGetRelatedIds(section, notionId) {
   return related;
 }
 
-function campanaSelectItem(section, notionId) {
+function campanaSelectItem(section, entityId) {
   // Toggle: si ya estaba seleccionado, deseleccionar
-  if (campanaSelected && campanaSelected.section === section && campanaSelected.notion_id === notionId) {
+  if (campanaSelected && campanaSelected.section === section && campanaSelected.id === entityId) {
     campanaSelected = null;
   } else {
-    campanaSelected = { section, notion_id: notionId };
+    campanaSelected = { section, id: entityId };
   }
   renderCampana();
 }
@@ -1180,7 +1180,7 @@ const CAMPANA_COL_DEFS = [
       const cls = ['campana-mini'];
       if (isRelated) cls.push('campana-related');
       if (isSelected) cls.push('campana-selected');
-      return `<div class="${cls.join(' ')}" data-section="npcs" data-notion-id="${n.notion_id}" onclick="campanaClickMini(this, event)">
+      return `<div class="${cls.join(' ')}" data-section="npcs" data-entity-id="${n.id}" onclick="campanaClickMini(this, event)">
         <div class="campana-mini-top"><div class="campana-mini-name">${escapeHtml(n.nombre)}</div><button class="campana-detail-btn" onclick="campanaOpenDetail(this, event)" title="Ver detalle"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button></div>
         <div class="campana-mini-meta">${rolBadge(n.rol)} ${n.ciudad ? `<span class="campana-mini-dim">${escapeHtml(n.ciudad.nombre)}</span>` : ''}</div>
       </div>`;
@@ -1200,7 +1200,7 @@ const CAMPANA_COL_DEFS = [
       const cls = ['campana-mini'];
       if (isRelated) cls.push('campana-related');
       if (isSelected) cls.push('campana-selected');
-      return `<div class="${cls.join(' ')}" data-section="ciudades" data-notion-id="${c.notion_id}" onclick="campanaClickMini(this, event)">
+      return `<div class="${cls.join(' ')}" data-section="ciudades" data-entity-id="${c.id}" onclick="campanaClickMini(this, event)">
         <div class="campana-mini-top"><div class="campana-mini-name">${escapeHtml(c.nombre)}</div><button class="campana-detail-btn" onclick="campanaOpenDetail(this, event)" title="Ver detalle"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button></div>
         <div class="campana-mini-meta">${c.estado ? `<span class="campana-mini-dim">${escapeHtml(c.estado)}</span>` : ''}${c.poblacion ? `<span class="campana-mini-dim">Pob. ${c.poblacion.toLocaleString()}</span>` : ''}</div>
       </div>`;
@@ -1217,7 +1217,7 @@ const CAMPANA_COL_DEFS = [
       const cls = ['campana-mini'];
       if (isRelated) cls.push('campana-related');
       if (isSelected) cls.push('campana-selected');
-      return `<div class="${cls.join(' ')}" data-section="lugares" data-notion-id="${l.notion_id}" onclick="campanaClickMini(this, event)">
+      return `<div class="${cls.join(' ')}" data-section="lugares" data-entity-id="${l.id}" onclick="campanaClickMini(this, event)">
         <div class="campana-mini-top"><div class="campana-mini-name">${escapeHtml(l.nombre)}</div><button class="campana-detail-btn" onclick="campanaOpenDetail(this, event)" title="Ver detalle"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button></div>
         <div class="campana-mini-meta">${l.tipo ? `<span class="badge tipo-badge" style="font-size:0.6rem">${escapeHtml(l.tipo)}</span>` : ''}${l.region ? `<span class="campana-mini-dim">${escapeHtml(l.region)}</span>` : ''}</div>
       </div>`;
@@ -1236,7 +1236,7 @@ const CAMPANA_COL_DEFS = [
       const cls = ['campana-mini'];
       if (isRelated) cls.push('campana-related');
       if (isSelected) cls.push('campana-selected');
-      return `<div class="${cls.join(' ')}" data-section="quests" data-notion-id="${q.notion_id}" onclick="campanaClickMini(this, event)">
+      return `<div class="${cls.join(' ')}" data-section="quests" data-entity-id="${q.id}" onclick="campanaClickMini(this, event)">
         <div class="campana-mini-top"><div class="campana-mini-name">${escapeHtml(q.nombre)}</div><button class="campana-detail-btn" onclick="campanaOpenDetail(this, event)" title="Ver detalle"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button></div>
         <div class="campana-mini-meta">${estadoQuestBadge(q.estado)}</div>
       </div>`;
@@ -1254,7 +1254,7 @@ const CAMPANA_COL_DEFS = [
       const cls = ['campana-mini'];
       if (isRelated) cls.push('campana-related');
       if (isSelected) cls.push('campana-selected');
-      return `<div class="${cls.join(' ')}" data-section="items" data-notion-id="${i.notion_id}" onclick="campanaClickMini(this, event)">
+      return `<div class="${cls.join(' ')}" data-section="items" data-entity-id="${i.id}" onclick="campanaClickMini(this, event)">
         <div class="campana-mini-top"><div class="campana-mini-name">${escapeHtml(i.nombre)}</div><button class="campana-detail-btn" onclick="campanaOpenDetail(this, event)" title="Ver detalle"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button></div>
         <div class="campana-mini-meta">${i.rareza ? rarezaBadge(i.rareza) : ''}${i.tipo ? `<span class="badge tipo-badge" style="font-size:0.6rem">${escapeHtml(i.tipo)}</span>` : ''}</div>
       </div>`;
@@ -1273,7 +1273,7 @@ const CAMPANA_COL_DEFS = [
       const cls = ['campana-mini'];
       if (isRelated) cls.push('campana-related');
       if (isSelected) cls.push('campana-selected');
-      return `<div class="${cls.join(' ')}" data-section="establecimientos" data-notion-id="${e.notion_id}" onclick="campanaClickMini(this, event)">
+      return `<div class="${cls.join(' ')}" data-section="establecimientos" data-entity-id="${e.id}" onclick="campanaClickMini(this, event)">
         <div class="campana-mini-top"><div class="campana-mini-name">${escapeHtml(e.nombre)}</div><button class="campana-detail-btn" onclick="campanaOpenDetail(this, event)" title="Ver detalle"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button></div>
         <div class="campana-mini-meta">${e.tipo ? `<span class="badge tipo-badge" style="font-size:0.6rem">${escapeHtml(e.tipo)}</span>` : ''}${e.ciudad ? `<span class="campana-mini-dim">${escapeHtml(e.ciudad.nombre)}</span>` : ''}</div>
       </div>`;
@@ -1407,8 +1407,8 @@ function campanaSetFilter(colKey, filterId, value) {
 
 function campanaClickMini(el, event) {
   const section = el.dataset.section;
-  const notionId = el.dataset.notionId;
-  campanaSelectItem(section, notionId);
+  const entityId = el.dataset.entityId;
+  campanaSelectItem(section, entityId);
 }
 
 function campanaOpenDetail(btn, event) {
@@ -1427,7 +1427,7 @@ function renderCampana() {
 
   campanaInitVisibleCols();
   const searchVal = (document.getElementById('campana-search')?.value || '').toLowerCase().trim();
-  const relatedIds = campanaSelected ? campanaGetRelatedIds(campanaSelected.section, campanaSelected.notion_id) : null;
+  const relatedIds = campanaSelected ? campanaGetRelatedIds(campanaSelected.section, campanaSelected.id) : null;
 
   for (const col of CAMPANA_COL_DEFS) {
     if (!campanaVisibleCols.has(col.key)) continue;
@@ -1474,16 +1474,16 @@ function renderCampana() {
       if (col.key === campanaSelected.section) {
         // En la propia columna: el seleccionado va primero
         items.sort((a, b) => {
-          const aS = a.notion_id === campanaSelected.notion_id ? 0 : 1;
-          const bS = b.notion_id === campanaSelected.notion_id ? 0 : 1;
+          const aS = a.id === campanaSelected.id ? 0 : 1;
+          const bS = b.id === campanaSelected.id ? 0 : 1;
           return aS - bS;
         });
       } else if (relatedIds && relatedIds[col.key]) {
         // En otras columnas: relacionados primero
         const relSet = relatedIds[col.key];
         items.sort((a, b) => {
-          const aRel = relSet.has(a.notion_id) ? 0 : 1;
-          const bRel = relSet.has(b.notion_id) ? 0 : 1;
+          const aRel = relSet.has(a.id) ? 0 : 1;
+          const bRel = relSet.has(b.id) ? 0 : 1;
           return aRel - bRel;
         });
       }
@@ -1517,8 +1517,8 @@ function renderCampana() {
         listEl.innerHTML = `<div class="campana-empty">Sin registros</div>`;
       } else {
         listEl.innerHTML = items.map(item => {
-          const isSelected = campanaSelected && campanaSelected.section === col.key && campanaSelected.notion_id === item.notion_id;
-          const isRelated = relatedIds && relatedIds[col.key] && relatedIds[col.key].has(item.notion_id);
+          const isSelected = campanaSelected && campanaSelected.section === col.key && campanaSelected.id === item.id;
+          const isRelated = relatedIds && relatedIds[col.key] && relatedIds[col.key].has(item.id);
           return col.renderMini(item, isRelated, isSelected);
         }).join('');
       }
@@ -1591,7 +1591,7 @@ function renderPersonajes() {
       </div>` : '';
 
     return `
-    <div class="${cardClass}" data-section="personajes" data-notion-id="${p.notion_id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
+    <div class="${cardClass}" data-section="personajes" data-entity-id="${p.id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
       <div class="card-header">
         <div>
           <div class="card-title">${escapeHtml(p.nombre)}${ddb && ddb.avatar ? `<img class="ddb-card-avatar" src="${ddb.avatar}" alt="">` : ''}</div>
@@ -1621,8 +1621,8 @@ function renderQuests() {
   grid.innerHTML = items.map(q => {
     const gp = q.recompensa_gp ? `<span class="quest-recompensa">&#9830; ${escapeHtml(q.recompensa_gp)} GP</span>` : '';
     return `
-    <div class="card" data-section="quests" data-notion-id="${q.notion_id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
-      ${visibilityToggleHtml('quests', q.notion_id, q.conocido_jugadores)}
+    <div class="card" data-section="quests" data-entity-id="${q.id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
+      ${visibilityToggleHtml('quests', q.id, q.conocido_jugadores)}
       <div class="card-header">
         <div>
           <div class="card-title">${escapeHtml(q.nombre)}</div>
@@ -1630,9 +1630,9 @@ function renderQuests() {
         </div>
       </div>
       <div class="card-body">
-        ${(q.quest_npcs && q.quest_npcs.length) ? `<div class="card-meta"><span class="meta-label">NPCs:</span> ${q.quest_npcs.map(n => relChip('npcs', n.notion_id, n.nombre)).join(' ')}</div>` : ''}
-        ${(q.lugares && q.lugares.length) ? `<div class="card-meta"><span class="meta-label">Lugares:</span> ${q.lugares.map(l => relChip('lugares', l.notion_id, l.nombre)).join(' ')}</div>` : ''}
-        ${(q.ciudades && q.ciudades.length) ? `<div class="card-meta"><span class="meta-label">Ciudades:</span> ${q.ciudades.map(c => relChip('ciudades', c.notion_id, c.nombre)).join(' ')}</div>` : ''}
+        ${(q.quest_npcs && q.quest_npcs.length) ? `<div class="card-meta"><span class="meta-label">NPCs:</span> ${q.quest_npcs.map(n => relChip('npcs', n.id, n.nombre)).join(' ')}</div>` : ''}
+        ${(q.lugares && q.lugares.length) ? `<div class="card-meta"><span class="meta-label">Lugares:</span> ${q.lugares.map(l => relChip('lugares', l.id, l.nombre)).join(' ')}</div>` : ''}
+        ${(q.ciudades && q.ciudades.length) ? `<div class="card-meta"><span class="meta-label">Ciudades:</span> ${q.ciudades.map(c => relChip('ciudades', c.id, c.nombre)).join(' ')}</div>` : ''}
         ${q.resumen ? `<div class="card-desc">${escapeHtml(stripMentions(q.resumen)).substring(0,150)}${q.resumen.length > 150 ? '\u2026' : ''}</div>` : ''}
       </div>
     </div>`;
@@ -1648,11 +1648,11 @@ function renderCiudades() {
   if (!items.length) { grid.innerHTML = emptyState('No hay ciudades.'); return; }
 
   grid.innerHTML = items.map(c => {
-    const cEstabs = (DATA.establecimientos || []).filter(e => e.ciudad && e.ciudad.notion_id === c.notion_id);
-    const cNpcs   = (DATA.npcs || []).filter(n => n.ciudad && n.ciudad.notion_id === c.notion_id);
+    const cEstabs = (DATA.establecimientos || []).filter(e => e.ciudad && e.ciudad.id === c.id);
+    const cNpcs   = (DATA.npcs || []).filter(n => n.ciudad && n.ciudad.id === c.id);
     return `
-    <div class="card" data-section="ciudades" data-notion-id="${c.notion_id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
-      ${visibilityToggleHtml('ciudades', c.notion_id, c.conocida_jugadores)}
+    <div class="card" data-section="ciudades" data-entity-id="${c.id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
+      ${visibilityToggleHtml('ciudades', c.id, c.conocida_jugadores)}
       <div class="card-header">
         <div>
           <div class="card-title">${escapeHtml(c.nombre)}</div>
@@ -1665,8 +1665,8 @@ function renderCiudades() {
           ${c.poblacion ? `<span class="meta-item"><span class="meta-label">Pob.:</span> ${c.poblacion.toLocaleString()}</span>` : ''}
         </div>
         ${c.descripcion ? `<div class="card-desc">${escapeHtml(stripMentions(c.descripcion))}</div>` : ''}
-        ${cEstabs.length ? `<div style="margin-top:8px"><div style="font-family:'Cinzel',serif;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.1em;margin-bottom:4px">ESTABLECIMIENTOS</div><div style="display:flex;flex-wrap:wrap;gap:4px">${cEstabs.map(e => relChip('establecimientos', e.notion_id, e.nombre)).join('')}</div></div>` : ''}
-        ${cNpcs.length ? `<div style="margin-top:8px"><div style="font-family:'Cinzel',serif;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.1em;margin-bottom:4px">NPCS</div><div style="display:flex;flex-wrap:wrap;gap:4px">${cNpcs.map(n => relChip('npcs', n.notion_id, n.nombre)).join('')}</div></div>` : ''}
+        ${cEstabs.length ? `<div style="margin-top:8px"><div style="font-family:'Cinzel',serif;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.1em;margin-bottom:4px">ESTABLECIMIENTOS</div><div style="display:flex;flex-wrap:wrap;gap:4px">${cEstabs.map(e => relChip('establecimientos', e.id, e.nombre)).join('')}</div></div>` : ''}
+        ${cNpcs.length ? `<div style="margin-top:8px"><div style="font-family:'Cinzel',serif;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.1em;margin-bottom:4px">NPCS</div><div style="display:flex;flex-wrap:wrap;gap:4px">${cNpcs.map(n => relChip('npcs', n.id, n.nombre)).join('')}</div></div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -1711,19 +1711,19 @@ function renderEstablecimientosGrid() {
   if (!items.length) { grid.innerHTML = emptyState('No hay establecimientos con esos filtros.'); return; }
 
   grid.innerHTML = items.map(e => `
-    <div class="card" data-section="establecimientos" data-notion-id="${e.notion_id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
-      ${visibilityToggleHtml('establecimientos', e.notion_id, e.conocido_jugadores)}
+    <div class="card" data-section="establecimientos" data-entity-id="${e.id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
+      ${visibilityToggleHtml('establecimientos', e.id, e.conocido_jugadores)}
       <div class="card-header">
         <div>
           <div class="card-title">${escapeHtml(e.nombre)}</div>
           <div class="card-meta" style="margin-top:5px">
             <span class="badge tipo-badge">${val(e.tipo)}</span>
-            ${e.ciudad ? relChip('ciudades', e.ciudad.notion_id, e.ciudad.nombre) : ''}
+            ${e.ciudad ? relChip('ciudades', e.ciudad.id, e.ciudad.nombre) : ''}
           </div>
         </div>
       </div>
       <div class="card-body">
-        ${e.dueno ? `<div class="card-meta"><span class="meta-item"><span class="meta-label">Due\u00f1o:</span> ${relChip('npcs', e.dueno.notion_id, e.dueno.nombre)}</span></div>` : ''}
+        ${e.dueno ? `<div class="card-meta"><span class="meta-item"><span class="meta-label">Due\u00f1o:</span> ${relChip('npcs', e.dueno.id, e.dueno.nombre)}</span></div>` : ''}
         ${e.descripcion_interior ? `<div class="card-desc">${escapeHtml(stripMentions(e.descripcion_interior))}</div>` : ''}
       </div>
     </div>`).join('');
@@ -1742,8 +1742,8 @@ function renderLugares() {
   if (!items.length) { grid.innerHTML = emptyState('No hay lugares registrados.'); return; }
 
   grid.innerHTML = items.map(l => `
-    <div class="card" data-section="lugares" data-notion-id="${l.notion_id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
-      ${visibilityToggleHtml('lugares', l.notion_id, l.conocido_jugadores)}
+    <div class="card" data-section="lugares" data-entity-id="${l.id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
+      ${visibilityToggleHtml('lugares', l.id, l.conocido_jugadores)}
       <div class="card-header">
         <div>
           <div class="card-title">${escapeHtml(l.nombre)}</div>
@@ -1816,8 +1816,8 @@ function renderNPCsGrid() {
   if (!items.length) { grid.innerHTML = emptyState('No hay NPCs con esos filtros.'); return; }
 
   grid.innerHTML = items.map(n => `
-    <div class="card" data-section="npcs" data-notion-id="${n.notion_id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
-      ${visibilityToggleHtml('npcs', n.notion_id, n.conocido_jugadores)}
+    <div class="card" data-section="npcs" data-entity-id="${n.id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
+      ${visibilityToggleHtml('npcs', n.id, n.conocido_jugadores)}
       <div class="card-header">
         <div>
           <div class="card-title">${escapeHtml(n.nombre)}</div>
@@ -1831,8 +1831,8 @@ function renderNPCsGrid() {
       <div class="card-body">
         <div class="card-meta">
           ${n.raza ? `<span class="meta-item"><span class="meta-label">Raza:</span> ${escapeHtml(n.raza)}</span>` : ''}
-          ${n.ciudad ? `<span class="meta-item"><span class="meta-label">Ciudad:</span> ${relChip('ciudades', n.ciudad.notion_id, n.ciudad.nombre)}</span>` : ''}
-          ${n.establecimiento ? `<span class="meta-item"><span class="meta-label">Lugar:</span> ${relChip('establecimientos', n.establecimiento.notion_id, n.establecimiento.nombre)}</span>` : ''}
+          ${n.ciudad ? `<span class="meta-item"><span class="meta-label">Ciudad:</span> ${relChip('ciudades', n.ciudad.id, n.ciudad.nombre)}</span>` : ''}
+          ${n.establecimiento ? `<span class="meta-item"><span class="meta-label">Lugar:</span> ${relChip('establecimientos', n.establecimiento.id, n.establecimiento.nombre)}</span>` : ''}
         </div>
         ${n.primera_impresion ? `<div class="card-desc">${escapeHtml(stripMentions(n.primera_impresion)).substring(0,120)}${n.primera_impresion.length > 120 ? '\u2026' : ''}</div>` : ''}
       </div>
@@ -1877,8 +1877,8 @@ function renderItemsGrid() {
   if (!items.length) { grid.innerHTML = emptyState('No hay items visibles.'); return; }
 
   grid.innerHTML = items.map(it => `
-    <div class="card" data-section="items" data-notion-id="${it.notion_id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
-      ${visibilityToggleHtml('items', it.notion_id, it.conocido_jugadores)}
+    <div class="card" data-section="items" data-entity-id="${it.id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
+      ${visibilityToggleHtml('items', it.id, it.conocido_jugadores)}
       <div class="card-header">
         <div>
           <div class="card-title">${escapeHtml(it.nombre)}</div>
@@ -1890,7 +1890,7 @@ function renderItemsGrid() {
       </div>
       <div class="card-body">
         <div class="card-meta">
-          ${it.personaje ? `<span class="meta-item"><span class="meta-label">Portador:</span> ${relChip('personajes', it.personaje.notion_id, it.personaje.nombre)}</span>` : '<span class="meta-item" style="color:var(--text-dim)">Sin portador</span>'}
+          ${it.personaje ? `<span class="meta-item"><span class="meta-label">Portador:</span> ${relChip('personajes', it.personaje.id, it.personaje.nombre)}</span>` : '<span class="meta-item" style="color:var(--text-dim)">Sin portador</span>'}
           ${it.requiere_sintonizacion ? `<span class="badge badge-rare" style="font-size:0.58rem">Attunement</span>` : ''}
         </div>
       </div>
@@ -1956,7 +1956,7 @@ function renderNotasGrid() {
       : `<div class="card-desc" style="border-top:none;padding-top:0;opacity:0.5">Sin resumen a\u00fan.</div>`;
 
     return `
-    <div class="card nota-card" data-section="${sectionKey}" data-notion-id="${n.notion_id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
+    <div class="card nota-card" data-section="${sectionKey}" data-entity-id="${n.id || ''}" onclick="openDetailFromCard(this)" style="cursor:pointer">
       <div class="card-header">
         <div class="card-title">${escapeHtml(n.nombre)}</div>
         <div class="nota-meta">
@@ -2014,14 +2014,14 @@ async function saveToGitHub(filename, data) {
   }
 }
 
-async function deleteRecord(section, notionId) {
+async function deleteRecord(section, entityId) {
   const label = SECTION_LABELS[section] || section;
   if (!confirm(`¿Eliminar este registro de ${label}? Se archivará.`)) return;
   const spinner = document.getElementById('spinner');
   spinner.classList.add('open');
   try {
     const arr = DATA[section] || [];
-    const record = arr.find(r => r.notion_id === notionId);
+    const record = arr.find(r => r.id === entityId);
     if (record && record._sbid) {
       await sbDelete(section, record._sbid);
       // Limpiar marcadores si es un lugar
@@ -2029,9 +2029,9 @@ async function deleteRecord(section, notionId) {
         await sbClient.from('marcadores').delete().eq('lugar_id', record._sbid);
       }
     }
-    DATA[section] = arr.filter(r => r.notion_id !== notionId);
-    if (section === 'lugares' && MAP_MARKERS[notionId]) {
-      delete MAP_MARKERS[notionId];
+    DATA[section] = arr.filter(r => r.id !== entityId);
+    if (section === 'lugares' && MAP_MARKERS[entityId]) {
+      delete MAP_MARKERS[entityId];
       localStorage.setItem('map_markers', JSON.stringify(MAP_MARKERS));
     }
     closeModal();
@@ -2043,10 +2043,10 @@ async function deleteRecord(section, notionId) {
   }
 }
 
-async function saveMarkerPosition(notionId, x, y) {
-  MAP_MARKERS[notionId] = { x, y };
+async function saveMarkerPosition(entityId, x, y) {
+  MAP_MARKERS[entityId] = { x, y };
   localStorage.setItem('map_markers', JSON.stringify(MAP_MARKERS));
-  try { await sbUpsertMarker(notionId, x, y); } catch(e) { console.warn('Supabase marker sync failed:', e); }
+  try { await sbUpsertMarker(entityId, x, y); } catch(e) { console.warn('Supabase marker sync failed:', e); }
 }
 
 // ── RENDER BESTIARIO ─────────────────────────────────────────────────
@@ -2141,7 +2141,7 @@ function renderBestiarioGrid() {
   }
 
   tbody.innerHTML = items.map(m => `
-    <tr class="bestiario-row" data-section="monstruos" data-notion-id="${m.notion_id || m.id || ''}" onclick="openDetailFromCard(this)">
+    <tr class="bestiario-row" data-section="monstruos" data-entity-id="${m.id || m.id || ''}" onclick="openDetailFromCard(this)">
       <td class="bestiario-name">${escapeHtml(m.nombre || '')}</td>
       <td class="bestiario-cr">${escapeHtml(val(m.cr))}</td>
       <td>${escapeHtml(val(m.tipo))}</td>
@@ -2243,7 +2243,7 @@ function renderCatalogoItemsGrid() {
   }
 
   tbody.innerHTML = items.map(it => `
-    <tr class="bestiario-row" data-section="items_catalog" data-notion-id="${it.notion_id || it.id || ''}" onclick="openDetailFromCard(this)">
+    <tr class="bestiario-row" data-section="items_catalog" data-entity-id="${it.id || it.id || ''}" onclick="openDetailFromCard(this)">
       <td class="bestiario-name">${escapeHtml(it.nombre || '')}</td>
       <td><span class="rareza-badge rareza-${(it.rareza || '').toLowerCase().replace(/\s+/g,'-')}">${escapeHtml(val(it.rareza))}</span></td>
       <td>${escapeHtml(val(it.tipo))}</td>
@@ -2396,8 +2396,8 @@ function formFieldHTML(field, data) {
       srcArr = srcArr.filter(r => r.conocida_jugadores || r.conocido_jugadores || r.creado_por_jugador);
     }
     const current = data ? data[field.key] : null;
-    const currentId = current ? current.notion_id : '';
-    const items = [{ value: '', label: '— Ninguno —' }, ...srcArr.map(r => ({ value: r.notion_id, label: r.nombre }))];
+    const currentId = current ? current.id : '';
+    const items = [{ value: '', label: '— Ninguno —' }, ...srcArr.map(r => ({ value: r.id, label: r.nombre }))];
     const selLabel = items.find(i => i.value === currentId)?.label || '';
     return `<div class="form-group"><label>${field.label}</label>
       <div class="ss-wrap" data-field="${field.key}">
@@ -2412,9 +2412,9 @@ function formFieldHTML(field, data) {
       srcArr = srcArr.filter(r => r.conocida_jugadores || r.conocido_jugadores || r.creado_por_jugador);
     }
     const currentArr = (data ? data[field.key] : null) || [];
-    const selectedIds = currentArr.map(r => r.notion_id);
-    const chips = currentArr.map(r => `<span class="ssm-chip" data-id="${r.notion_id}">${escapeHtml(r.nombre)}<span class="ssm-chip-x">&times;</span></span>`).join('');
-    const items = srcArr.map(r => `<div class="ss-option" data-value="${r.notion_id}" style="${selectedIds.includes(r.notion_id) ? 'display:none' : ''}">${escapeHtml(r.nombre)}</div>`).join('');
+    const selectedIds = currentArr.map(r => r.id);
+    const chips = currentArr.map(r => `<span class="ssm-chip" data-id="${r.id}">${escapeHtml(r.nombre)}<span class="ssm-chip-x">&times;</span></span>`).join('');
+    const items = srcArr.map(r => `<div class="ss-option" data-value="${r.id}" style="${selectedIds.includes(r.id) ? 'display:none' : ''}">${escapeHtml(r.nombre)}</div>`).join('');
     return `<div class="form-group"><label>${field.label}</label>
       <div class="ssm-wrap" data-field="${field.key}" data-source="${field.source}">
         <input type="hidden" id="field-${field.key}" value='${JSON.stringify(selectedIds)}'>
@@ -2583,7 +2583,7 @@ async function saveModal() {
   if (!currentModalSection) return;
 
   const schema = FORM_SCHEMAS[currentModalSection] || [];
-  const newData = currentModalData ? {...currentModalData} : { notion_id: null };
+  const newData = currentModalData ? {...currentModalData} : { id: null };
 
   for (const field of schema) {
     const el = document.getElementById(`field-${field.key}`);
@@ -2596,15 +2596,15 @@ async function saveModal() {
       const ids = JSON.parse(el.value || '[]');
       const srcArr = (DATA[field.source] || []).filter(field.filter || (() => true));
       newData[field.key] = ids.map(id => {
-        const found = srcArr.find(r => r.notion_id === id);
-        return found ? { notion_id: found.notion_id, nombre: found.nombre } : null;
+        const found = srcArr.find(r => r.id === id);
+        return found ? { id: found.id, nombre: found.nombre } : null;
       }).filter(Boolean);
     } else if (field.type === 'select-rel') {
       const selectedId = el.value;
       if (selectedId) {
         const srcArr = (DATA[field.source] || []).filter(field.filter || (() => true));
-        const found = srcArr.find(r => r.notion_id === selectedId);
-        newData[field.key] = found ? { notion_id: found.notion_id, nombre: found.nombre } : null;
+        const found = srcArr.find(r => r.id === selectedId);
+        newData[field.key] = found ? { id: found.id, nombre: found.nombre } : null;
       } else {
         newData[field.key] = null;
       }
@@ -2624,7 +2624,7 @@ async function saveModal() {
   if (tableKey === 'notas') tableKey = 'notas_dm';
   const dataKey = DATA_KEY_MAP[tableKey] || tableKey;
   const filename = FILE_MAP[tableKey] || `${tableKey}.json`;
-  const action = (currentModalData && currentModalData.notion_id) ? 'edit' : 'add';
+  const action = (currentModalData && currentModalData.id) ? 'edit' : 'add';
 
   // Marcar registros creados por jugadores (solo tablas que tienen estas columnas)
   if (action === 'add' && !isDM() && dataKey !== 'notas_jugadores') {
@@ -2639,7 +2639,7 @@ async function saveModal() {
   if (action === 'add') {
     DATA[dataKey].push(newData);
   } else {
-    const idx = DATA[dataKey].findIndex(i => i.notion_id === newData.notion_id);
+    const idx = DATA[dataKey].findIndex(i => i.id === newData.id);
     if (idx >= 0) DATA[dataKey][idx] = newData;
   }
 
@@ -2649,7 +2649,7 @@ async function saveModal() {
     await sbSave(dataKey, newData, action);
     // Si creamos un Lugar desde el mapa, guardar posición del marcador
     if (action === 'add' && dataKey === 'lugares' && pendingMarkerCoords) {
-      try { await saveMarkerPosition(newData.notion_id, pendingMarkerCoords.x, pendingMarkerCoords.y); } catch(me) { console.warn('Marker save failed:', me); }
+      try { await saveMarkerPosition(newData.id, pendingMarkerCoords.x, pendingMarkerCoords.y); } catch(me) { console.warn('Marker save failed:', me); }
       pendingMarkerCoords = null;
     }
     closeModal();
@@ -3214,7 +3214,7 @@ function renderMapMarkers() {
   const visibles = isDM() ? lugares : lugares.filter(l => l.conocido_jugadores || l.creado_por_jugador);
 
   for (const lugar of visibles) {
-    const pos = MAP_MARKERS[lugar.notion_id];
+    const pos = MAP_MARKERS[lugar.id];
     if (!pos) continue;
 
     const color = MARKER_COLORS[lugar.tipo] || MARKER_COLORS['Otro'];

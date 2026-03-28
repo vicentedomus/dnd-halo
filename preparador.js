@@ -135,10 +135,10 @@ function openNewPlanForm() {
 
   // Personajes (PJs) — todos seleccionados por defecto
   const pjs = (DATA.players || []).filter(p => p.es_pj);
-  pjs.forEach(p => prepSelectedPlayers.push({ id: p.notion_id || p.nombre, nombre: p.nombre }));
+  pjs.forEach(p => prepSelectedPlayers.push({ id: p.id || p.nombre, nombre: p.nombre }));
 
   const pjCards = pjs.map(p => {
-    const pid = escapeAttr(String(p.notion_id || p.nombre));
+    const pid = escapeAttr(String(p.id || p.nombre));
     return `
       <div class="bloque-item prep-pj-card selected" id="prep-pj-${pid}"
            onclick="togglePrepPlayer('${pid}', '${escapeAttr(p.nombre)}')">
@@ -358,11 +358,11 @@ function renderPrepCtxTable(query) {
 
   const srcMap = {
     notas_dm: [...(DATA.notas_dm || [])].sort(byFecha)
-      .map(n => ({ id: n.notion_id, titulo: n.titulo || n.nombre || '(sin título)', tipo: 'Nota DM', fecha: n.fecha || '' })),
+      .map(n => ({ id: n.id, titulo: n.titulo || n.nombre || '(sin título)', tipo: 'Nota DM', fecha: n.fecha || '' })),
     notas_jugadores: [...(DATA.notas_jugadores || [])].sort(byFecha)
-      .map(n => ({ id: n.notion_id, titulo: n.titulo || n.nombre || '(sin título)', tipo: 'Nota Jugadores', fecha: n.fecha || '' })),
+      .map(n => ({ id: n.id, titulo: n.titulo || n.nombre || '(sin título)', tipo: 'Nota Jugadores', fecha: n.fecha || '' })),
     quests: [...(DATA.quests || [])].sort(byFecha)
-      .map(qst => ({ id: qst.notion_id, titulo: qst.nombre || qst.titulo || '(sin título)', tipo: 'Quest', fecha: qst.fecha || '' })),
+      .map(qst => ({ id: qst.id, titulo: qst.nombre || qst.titulo || '(sin título)', tipo: 'Quest', fecha: qst.fecha || '' })),
   };
 
   let items = srcMap[prepCtxCurrentTab] || [];
@@ -426,14 +426,14 @@ function searchPrepNpcs(query) {
 
   const npcs = DATA.npcs || [];
   const matches = npcs.filter(n =>
-    (n.nombre || '').toLowerCase().includes(q) && !prepSelectedNpcs.find(x => x.id === n.notion_id)
+    (n.nombre || '').toLowerCase().includes(q) && !prepSelectedNpcs.find(x => x.id === n.id)
   ).slice(0, 10);
 
   if (!matches.length) { results.style.display = 'none'; return; }
 
   results.style.display = '';
   results.innerHTML = matches.map(n => {
-    const id = escapeAttr(n.notion_id);
+    const id = escapeAttr(n.id);
     const nombre = escapeAttr(n.nombre);
     return `<div class="monster-search-item" onclick="addPrepNpc('${id}','${nombre}')">${escapeHtml(n.nombre)}</div>`;
   }).join('');
@@ -474,9 +474,9 @@ function searchPrepLocaciones(query) {
   if (!q) { results.style.display = 'none'; return; }
 
   const all = [
-    ...(DATA.lugares || []).map(l => ({ id: l.notion_id, nombre: l.nombre, _cat: 'Lugar' })),
-    ...(DATA.ciudades || []).map(c => ({ id: c.notion_id, nombre: c.nombre, _cat: 'Ciudad' })),
-    ...(DATA.establecimientos || []).map(e => ({ id: e.notion_id, nombre: e.nombre, _cat: 'Establecimiento' })),
+    ...(DATA.lugares || []).map(l => ({ id: l.id, nombre: l.nombre, _cat: 'Lugar' })),
+    ...(DATA.ciudades || []).map(c => ({ id: c.id, nombre: c.nombre, _cat: 'Ciudad' })),
+    ...(DATA.establecimientos || []).map(e => ({ id: e.id, nombre: e.nombre, _cat: 'Establecimiento' })),
   ];
 
   const matches = all.filter(l =>
@@ -693,7 +693,7 @@ async function generatePlan() {
 
   // Personajes: objeto completo desde DATA.players
   const personajesCompletos = prepSelectedPlayers.map(sel => {
-    const p = (DATA.players || []).find(x => (x.notion_id || x.nombre) === sel.id) || {};
+    const p = (DATA.players || []).find(x => (x.id || x.nombre) === sel.id) || {};
     const base = { nombre: sel.nombre, raza: p.raza || '?', clase: p.clase || '?', nivel: p.nivel || '?', jugador: p.jugador || '?' };
     // Enriquecer con D&D Beyond si disponible
     const ddb = p.ddb_data;
@@ -710,18 +710,18 @@ async function generatePlan() {
 
   // NPCs: objeto completo desde DATA.npcs
   const npcsCompletos = prepSelectedNpcs.map(sel => {
-    const n = (DATA.npcs || []).find(x => x.notion_id === sel.id) || {};
+    const n = (DATA.npcs || []).find(x => x.id === sel.id) || {};
     return { nombre: sel.nombre, raza: n.raza || '', tipo_npc: n.tipo_npc || '', primera_impresion: n.primera_impresion || '' };
   });
 
   // Locaciones: objeto completo desde las 3 fuentes
   const locacionesCompletas = prepSelectedLugares.map(sel => {
     const allLocs = [
-      ...(DATA.lugares || []).map(l => ({ notion_id: l.notion_id, tipo: l.tipo || 'Lugar', region: l.region || '' })),
-      ...(DATA.ciudades || []).map(c => ({ notion_id: c.notion_id, tipo: 'Ciudad', region: c.region || '' })),
-      ...(DATA.establecimientos || []).map(e => ({ notion_id: e.notion_id, tipo: e.tipo || 'Establecimiento', region: e.ciudad?.nombre || '' })),
+      ...(DATA.lugares || []).map(l => ({ id: l.id, tipo: l.tipo || 'Lugar', region: l.region || '' })),
+      ...(DATA.ciudades || []).map(c => ({ id: c.id, tipo: 'Ciudad', region: c.region || '' })),
+      ...(DATA.establecimientos || []).map(e => ({ id: e.id, tipo: e.tipo || 'Establecimiento', region: e.ciudad?.nombre || '' })),
     ];
-    const found = allLocs.find(x => x.notion_id === sel.id) || {};
+    const found = allLocs.find(x => x.id === sel.id) || {};
     return { nombre: sel.nombre, tipo: found.tipo || sel.cat || '?', region: found.region || '' };
   });
 
@@ -731,14 +731,14 @@ async function generatePlan() {
     ctxParts.push('\n## Contexto adicional seleccionado');
     prepSelectedContext.forEach(c => {
       if (c.tipo === 'Quest') {
-        const q = (DATA.quests || []).find(x => x.notion_id === c.id);
+        const q = (DATA.quests || []).find(x => x.id === c.id);
         if (q) {
           ctxParts.push(`\n### Quest: ${q.nombre || c.titulo} [${q.estado || '?'}]`);
           if (q.resumen) ctxParts.push(q.resumen);
           if (q.contenido_html) ctxParts.push(q.contenido_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
         }
       } else {
-        const nota = [...(DATA.notas_dm || []), ...(DATA.notas_jugadores || [])].find(x => x.notion_id === c.id);
+        const nota = [...(DATA.notas_dm || []), ...(DATA.notas_jugadores || [])].find(x => x.id === c.id);
         if (nota) {
           ctxParts.push(`\n### Nota: ${nota.nombre || c.titulo} (${nota.fecha || ''})`);
           if (nota.resumen) ctxParts.push(nota.resumen);

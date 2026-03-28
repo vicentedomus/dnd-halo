@@ -191,7 +191,7 @@ test.describe('Modal de detalle', () => {
     await expect(page.locator('#modal-overlay')).not.toHaveClass(/open/);
   });
 
-  test('nota DM muestra contenido (pre-migrado de Notion)', async ({ page }) => {
+  test('nota DM muestra contenido HTML', async ({ page }) => {
     await waitForGrid(page, 'grid-notas');
     // Click en la primera nota del grid
     await page.locator('#grid-notas .card').first().click();

@@ -1,27 +1,25 @@
 /**
  * supabase-client.js — Capa de datos Supabase para dnd-halo
- * Reemplaza el Cloudflare Worker proxy + Notion API
  */
 
 const sbClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
 // ── HELPERS ───────────────────────────────────────────────────────────
 
-/** Normaliza un registro de Supabase: expone _sbid y garantiza notion_id */
+/** Normaliza un registro de Supabase: expone _sbid */
 function _norm(entity) {
   if (!entity) return entity;
   entity._sbid = entity.id;
-  entity.notion_id = entity.notion_id || entity.id;
   return entity;
 }
 
-/** Convierte un objeto joinado a {notion_id, nombre} para compatibilidad con el frontend */
+/** Convierte un objeto joinado a {id, nombre} */
 function _toRef(obj) {
   if (!obj) return null;
-  return { notion_id: obj.notion_id || obj.id, nombre: obj.nombre };
+  return { id: obj.id, nombre: obj.nombre };
 }
 
-/** Agrupa filas de junction en un mapa: keyField → [{notion_id, nombre}] */
+/** Agrupa filas de junction en un mapa: keyField → [{id, nombre}] */
 function _groupRefs(rows, keyField, entityField) {
   const map = {};
   for (const row of (rows || [])) {
@@ -34,11 +32,11 @@ function _groupRefs(rows, keyField, entityField) {
   return map;
 }
 
-/** Busca el Supabase UUID (_sbid) dado un notion_id en un array de DATA */
-function _findSbid(dataKey, notionId) {
-  if (!notionId) return null;
+/** Busca el Supabase UUID (_sbid) dado un id en un array de DATA */
+function _findSbid(dataKey, entityId) {
+  if (!entityId) return null;
   const arr = DATA[dataKey] || [];
-  const found = arr.find(r => r.notion_id === notionId || r.id === notionId);
+  const found = arr.find(r => r.id === entityId);
   return found ? found._sbid : null;
 }
 
@@ -85,7 +83,7 @@ const FK_CONFIG = {
   personaje:       { column: 'personaje_id',        dataKey: 'players' },
 };
 
-const SKIP_FIELDS  = new Set(['_sbid', 'id', 'created_at', 'updated_at']);
+const SKIP_FIELDS  = new Set(['_sbid', 'id', 'created_at', 'updated_at', 'notion_id']);
 const ARRAY_FIELDS = new Set(['jugadores_presentes', 'jugador']); // text[] en BD, string en form
 
 // ── LOAD ALL DATA ─────────────────────────────────────────────────────
@@ -106,20 +104,20 @@ async function loadAllData() {
     sbClient.from('quests').select('*').eq('archived', false),
     sbClient.from('notas_dm').select('*').eq('archived', false),
     sbClient.from('notas_jugadores').select('*').eq('archived', false),
-    sbClient.from('npcs').select('*, ciudad:ciudad_id(id,notion_id,nombre), establecimiento:establecimiento_id(id,notion_id,nombre)').eq('archived', false),
-    sbClient.from('establecimientos').select('*, ciudad:ciudad_id(id,notion_id,nombre), dueno:dueno_id(id,notion_id,nombre)').eq('archived', false),
-    sbClient.from('items').select('*, personaje:personaje_id(id,notion_id,nombre)').eq('archived', false),
-    sbClient.from('lugares').select('*, ciudad:ciudad_id(id,notion_id,nombre)').eq('archived', false),
+    sbClient.from('npcs').select('*, ciudad:ciudad_id(id,nombre), establecimiento:establecimiento_id(id,nombre)').eq('archived', false),
+    sbClient.from('establecimientos').select('*, ciudad:ciudad_id(id,nombre), dueno:dueno_id(id,nombre)').eq('archived', false),
+    sbClient.from('items').select('*, personaje:personaje_id(id,nombre)').eq('archived', false),
+    sbClient.from('lugares').select('*, ciudad:ciudad_id(id,nombre)').eq('archived', false),
     // Junction tables con datos relacionados para construir refs
-    sbClient.from('npcs_quests').select('npc_id, quest_id, npc:npcs(id,notion_id,nombre), quest:quests(id,notion_id,nombre)'),
-    sbClient.from('quests_lugares').select('quest_id, lugar_id, quest:quests(id,notion_id,nombre), lugar:lugares(id,notion_id,nombre)'),
-    sbClient.from('quests_ciudades').select('quest_id, ciudad:ciudades(id,notion_id,nombre)'),
-    sbClient.from('quests_establecimientos').select('quest_id, establecimiento:establecimientos(id,notion_id,nombre)'),
-    sbClient.from('quests_notas_dm').select('quest_id, nota_dm_id, quest:quests(id,notion_id,nombre), nota_dm:notas_dm(id,notion_id,nombre)'),
-    sbClient.from('npcs_lugares').select('npc_id, lugar_id, npc:npcs(id,notion_id,nombre), lugar:lugares(id,notion_id,nombre)'),
-    sbClient.from('lugares_items').select('lugar_id, item:items(id,notion_id,nombre)'),
-    sbClient.from('notas_jugadores_items').select('nota_jugador_id, item:items(id,notion_id,nombre)'),
-    sbClient.from('npcs_items').select('npc_id, item:items(id,notion_id,nombre)'),
+    sbClient.from('npcs_quests').select('npc_id, quest_id, npc:npcs(id,nombre), quest:quests(id,nombre)'),
+    sbClient.from('quests_lugares').select('quest_id, lugar_id, quest:quests(id,nombre), lugar:lugares(id,nombre)'),
+    sbClient.from('quests_ciudades').select('quest_id, ciudad:ciudades(id,nombre)'),
+    sbClient.from('quests_establecimientos').select('quest_id, establecimiento:establecimientos(id,nombre)'),
+    sbClient.from('quests_notas_dm').select('quest_id, nota_dm_id, quest:quests(id,nombre), nota_dm:notas_dm(id,nombre)'),
+    sbClient.from('npcs_lugares').select('npc_id, lugar_id, npc:npcs(id,nombre), lugar:lugares(id,nombre)'),
+    sbClient.from('lugares_items').select('lugar_id, item:items(id,nombre)'),
+    sbClient.from('notas_jugadores_items').select('nota_jugador_id, item:items(id,nombre)'),
+    sbClient.from('npcs_items').select('npc_id, item:items(id,nombre)'),
     sbClient.from('marcadores').select('*'),
     sbClient.from('monstruos').select('*').eq('archived', false),
     sbClient.from('items_catalog').select('*').eq('archived', false),
@@ -215,7 +213,7 @@ async function loadAllData() {
   // Construir MAP_MARKERS desde Supabase (localStorage tiene prioridad)
   const sbMarkers = {};
   for (const m of (marcadoresRes.data || [])) {
-    const key = m.notion_id || m.lugar_id;
+    const key = m.lugar_id;
     if (key) sbMarkers[key] = { x: Number(m.x), y: Number(m.y) };
   }
   const stored = localStorage.getItem('map_markers');
@@ -235,7 +233,7 @@ async function sbSave(dataKey, data, action) {
   for (const [key, val] of Object.entries(data)) {
     if (SKIP_FIELDS.has(key)) continue;
     if (FK_CONFIG[key]) {
-      payload[FK_CONFIG[key].column] = val ? _findSbid(FK_CONFIG[key].dataKey, val.notion_id) : null;
+      payload[FK_CONFIG[key].column] = val ? _findSbid(FK_CONFIG[key].dataKey, val.id) : null;
       continue;
     }
     if (m2mKeys.has(key)) continue;
@@ -249,7 +247,6 @@ async function sbSave(dataKey, data, action) {
   let savedSbid = sbid;
 
   if (action === 'add') {
-    delete payload.notion_id; // se asigna tras el INSERT
     let { data: created, error } = await sbClient.from(sbTable).insert(payload).select().single();
     // Si falla por columna desconocida, reintentar sin ese campo
     if (error && error.message && error.message.includes('column')) {
@@ -261,11 +258,8 @@ async function sbSave(dataKey, data, action) {
     }
     if (error) throw new Error(error.message);
     savedSbid = created.id;
-    // Usar el UUID como notion_id para nuevos registros (clave única en el frontend)
-    await sbClient.from(sbTable).update({ notion_id: savedSbid }).eq('id', savedSbid);
-    data._sbid     = savedSbid;
-    data.id        = savedSbid;
-    data.notion_id = savedSbid;
+    data._sbid = savedSbid;
+    data.id    = savedSbid;
   } else {
     let { error } = await sbClient.from(sbTable).update(payload).eq('id', sbid);
     // Si falla por columna desconocida, reintentar sin ese campo
@@ -285,7 +279,7 @@ async function sbSave(dataKey, data, action) {
     await sbClient.from(cfg.table).delete().eq(cfg.selfCol, savedSbid);
     if (refs.length > 0) {
       const rows = refs.map(ref => {
-        const otherId = _findSbid(cfg.dataKey, ref.notion_id);
+        const otherId = _findSbid(cfg.dataKey, ref.id);
         return otherId ? { [cfg.selfCol]: savedSbid, [cfg.otherCol]: otherId } : null;
       }).filter(Boolean);
       if (rows.length > 0) {
@@ -334,11 +328,11 @@ async function sbSaveEntityNote(entityType, entityId, contenido) {
 
 // ── UPSERT MARCADOR ───────────────────────────────────────────────────
 
-async function sbUpsertMarker(notionId, x, y) {
-  const lugar = (DATA.lugares || []).find(l => l.notion_id === notionId);
+async function sbUpsertMarker(lugarId, x, y) {
+  const lugar = (DATA.lugares || []).find(l => l.id === lugarId);
   if (!lugar || !lugar._sbid) return;
   const { error } = await sbClient.from('marcadores').upsert(
-    { lugar_id: lugar._sbid, notion_id: notionId, x, y },
+    { lugar_id: lugar._sbid, x, y },
     { onConflict: 'lugar_id' }
   );
   if (error) console.warn('Marker upsert failed:', error.message);

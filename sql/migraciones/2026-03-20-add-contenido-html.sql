@@ -1,5 +1,5 @@
 -- =============================================================
--- Agregar contenido_html a tablas que tienen cuerpo de página en Notion
+-- Agregar contenido_html a tablas que tienen cuerpo de página
 -- Fecha: 2026-03-20
 -- Afecta: quests, items, notas_jugadores
 -- =============================================================
