@@ -2832,6 +2832,7 @@ async function renderMapa() {
     initMapMarkerDrop();
     renderMapMarkers();
     initMapToLegendHighlight();
+    initMapToolsBar();
     initFogBrushTools();
     initPartySystem();
     mapLoaded = true;
@@ -4010,8 +4011,9 @@ function hideHexTooltip() {
 function initHexTooltip() {
   if (!mapSvgEl || typeof HexGrid === 'undefined') return;
 
-  // Click en hex revelado: abrir panel de detalle
+  // Shift+Click en hex revelado: abrir panel de detalle
   mapSvgEl.addEventListener('click', (e) => {
+    if (!e.shiftKey) return;
     if (hexDebugMode || markerMode) return;
     const svgPt = screenToSvg(e.clientX, e.clientY);
     const hex = HexGrid.svgToHex(svgPt.x, svgPt.y);
@@ -4386,33 +4388,49 @@ function renderPartyToken() {
   g.appendChild(icon);
 }
 
-function initPartyDrag() {
-  if (!mapSvgEl) return;
-  const g = mapSvgEl.querySelector('#party-token');
-  if (!g) return;
+let partyDragBound = false;
 
-  g.addEventListener('mousedown', (e) => {
-    if (partyMoveMode) return; // No drag en modo viaje
+function initPartyDrag() {
+  if (!mapSvgEl || partyDragBound) return;
+  partyDragBound = true;
+
+  // Mousedown en el token
+  mapSvgEl.addEventListener('mousedown', (e) => {
+    if (partyMoveMode) return;
+    const g = mapSvgEl.querySelector('#party-token');
+    if (!g || !g.contains(e.target)) return;
     e.stopPropagation();
     e.preventDefault();
     partyDragging = true;
     g.style.cursor = 'grabbing';
   });
 
+  // Mousemove: solo actualizar posicion SVG, sin re-render completo
+  let lastDragKey = '';
   window.addEventListener('mousemove', (e) => {
     if (!partyDragging) return;
     const svgPt = screenToSvg(e.clientX, e.clientY);
     const hex = HexGrid.svgToHex(svgPt.x, svgPt.y);
+    const key = HexGrid.hexKey(hex.q, hex.r);
+    if (key === lastDragKey) return; // No actualizar si mismo hex
+    lastDragKey = key;
     partyPosition = { q: hex.q, r: hex.r };
-    renderPartyToken();
-    initPartyDrag(); // Re-bind drag a nuevo g
+    // Mover elementos existentes sin recrear
+    const center = HexGrid.hexCenter(hex.q, hex.r);
+    const g = mapSvgEl.querySelector('#party-token');
+    if (!g) return;
+    const circle = g.querySelector('circle');
+    const text = g.querySelector('text');
+    if (circle) { circle.setAttribute('cx', center.x); circle.setAttribute('cy', center.y); }
+    if (text) { text.setAttribute('x', center.x); text.setAttribute('y', center.y + 0.6); }
   });
 
   window.addEventListener('mouseup', () => {
     if (!partyDragging) return;
     partyDragging = false;
-    const g2 = mapSvgEl.querySelector('#party-token');
-    if (g2) g2.style.cursor = 'grab';
+    lastDragKey = '';
+    const g = mapSvgEl.querySelector('#party-token');
+    if (g) g.style.cursor = 'grab';
     savePartyData();
   });
 }
@@ -4739,19 +4757,6 @@ function initPartySystem() {
     wrapper.appendChild(panel);
   }
 
-  // Boton en zoom controls
-  const zoomControls = document.querySelector('.map-zoom-controls');
-  if (zoomControls && !document.getElementById('btn-party-move')) {
-    const btn = document.createElement('button');
-    btn.id = 'btn-party-move';
-    btn.className = 'map-zoom-btn map-marker-btn';
-    btn.title = 'Modo viaje';
-    btn.onclick = togglePartyMoveMode;
-    btn.innerHTML = '⚑';
-    btn.style.fontSize = '14px';
-    zoomControls.insertBefore(btn, zoomControls.firstChild);
-  }
-
   // Click para agregar waypoint (modo viaje)
   mapSvgEl.addEventListener('click', (e) => {
     if (!partyMoveMode) return;
@@ -4918,6 +4923,31 @@ function discardFogChanges() {
   updateFogPendingCount();
 }
 
+// =====================================================================
+// MAP TOOLS BAR — Barra de herramientas superior izquierda
+// =====================================================================
+
+function initMapToolsBar() {
+  const bar = document.getElementById('map-tools-bar');
+  if (!bar) return;
+  const dm = isDM();
+
+  let html = '';
+
+  if (dm) {
+    html += `<button class="map-tool-btn" id="btn-party-move" onclick="togglePartyMoveMode()" title="Modo viaje">⚑</button>`;
+    html += `<button class="map-tool-btn" id="btn-fog-brush" onclick="toggleFogBrush()" title="Herramientas de niebla">⬡</button>`;
+  }
+
+  html += `<button class="map-tool-btn" id="btn-exploration-log" onclick="toggleExplorationLog()" title="Diario de exploración">📜</button>`;
+
+  if (dm) {
+    html += `<button class="map-tool-btn" id="btn-add-marker" onclick="toggleMarkerMode()" title="Añadir Lugar" draggable="true" ondragstart="onMarkerDragStart(event)">📍</button>`;
+  }
+
+  bar.innerHTML = html;
+}
+
 function initFogBrushTools() {
   if (!mapSvgEl || typeof HexGrid === 'undefined') return;
   if (!isDM()) return;
@@ -4967,32 +4997,6 @@ function initFogBrushTools() {
       </div>
     `;
     wrapper.appendChild(panel);
-  }
-
-  // Botones en zoom controls
-  const zoomControls = document.querySelector('.map-zoom-controls');
-  if (zoomControls && !document.getElementById('btn-fog-brush')) {
-    // Boton log de exploracion
-    const logBtn = document.createElement('button');
-    logBtn.id = 'btn-exploration-log';
-    logBtn.className = 'map-zoom-btn map-marker-btn';
-    logBtn.title = 'Diario de exploración';
-    logBtn.onclick = toggleExplorationLog;
-    logBtn.innerHTML = '📜';
-    logBtn.style.fontSize = '14px';
-    zoomControls.insertBefore(logBtn, zoomControls.firstChild);
-
-    // Boton fog brush (solo DM)
-    if (isDM()) {
-      const btn = document.createElement('button');
-      btn.id = 'btn-fog-brush';
-      btn.className = 'map-zoom-btn map-marker-btn';
-      btn.title = 'Herramientas de niebla';
-      btn.onclick = toggleFogBrush;
-      btn.innerHTML = '⬡';
-      btn.style.fontSize = '18px';
-      zoomControls.insertBefore(btn, zoomControls.firstChild);
-    }
   }
 
   // --- Interaccion: hover highlight ---
