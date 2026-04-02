@@ -1,16 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const ALLOWED_ORIGINS = [
-  "https://vicentedomus.github.io",
-  "http://localhost:3000",
-  "http://localhost:5500",
-  "http://127.0.0.1:3000",
-  "http://127.0.0.1:5500",
-];
+const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") || "http://localhost:5500,http://127.0.0.1:5500,http://localhost:3000,http://127.0.0.1:3000").split(",");
 
-const DM_PASSWORD = "halo-dm";
+const DM_PASSWORD = Deno.env.get("DM_PASSWORD") || "";
+const CAMPAIGN_NAME = Deno.env.get("CAMPAIGN_NAME") || "D&D";
 
-const SYSTEM_PROMPT = `Eres un **planificador de sesiones de D&D 5e** para la campaña **Halo**. Tu trabajo es generar planes de sesión estructurados siguiendo la metodología de **Sly Flourish (The Lazy DM Workbook)**.
+const SYSTEM_PROMPT = `Eres un **planificador de sesiones de D&D 5e** para la campaña **${CAMPAIGN_NAME}**. Tu trabajo es generar planes de sesión estructurados siguiendo la metodología de **Sly Flourish (The Lazy DM Workbook)**.
 
 ---
 
@@ -66,7 +61,7 @@ Para cada monstruo seleccionado: cantidad sugerida y **por qué están ahí** na
 
 ## Instrucciones de tono
 
-- Ficción de **alta fantasía** — mundo Halo, dramático pero con espacio para improvisación
+- Ficción de **alta fantasía** — dramático pero con espacio para improvisación
 - Escribe en **español**
 - Dirígete al DM en segunda persona: "tus jugadores", "puedes usar..."
 - Sé **conciso y evocador** — como notas de prep, no como prosa literaria

@@ -6,4 +6,6 @@ supabase/.temp/
 stitch-mockups/
 exports/
 migrate/
+campaign.js
+setup/output/
 HEXPLORER_PLAN.md

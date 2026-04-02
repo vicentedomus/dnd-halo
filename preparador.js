@@ -1,5 +1,5 @@
 /* =============================================================
-   HALO — Preparador de Sesiones
+   Preparador de Sesiones
    preparador.js — Prepara sesiones con los 8 pasos de Sly Flourish
    Se abre dentro de util-workspace (pestaña Utilidades)
    ============================================================= */
@@ -806,7 +806,7 @@ async function generatePlan() {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${CONFIG.SUPABASE_ANON_KEY}`,
-        'X-DM-Auth': 'halo-dm',
+        'X-DM-Auth': sessionStorage.getItem('dm_password') || '',
       },
       body: JSON.stringify({
         formData,
@@ -1178,7 +1178,7 @@ async function regenerateBloque(planId, bloqueKey) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${CONFIG.SUPABASE_ANON_KEY}`,
-        'X-DM-Auth': 'halo-dm',
+        'X-DM-Auth': sessionStorage.getItem('dm_password') || '',
       },
       body: JSON.stringify({
         formData: { ...(plan.input_data || {}), bloque_objetivo: bloqueKey },

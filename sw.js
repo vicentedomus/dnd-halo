@@ -1,4 +1,4 @@
-const CACHE_NAME = 'halo-v1';
+const CACHE_NAME = 'campaign-v1';
 
 const STATIC_ASSETS = [
   '/',
@@ -6,6 +6,7 @@ const STATIC_ASSETS = [
   '/style.css',
   '/app.js',
   '/auth.js',
+  '/campaign.js',
   '/config.js',
   '/supabase-client.js',
   '/planear.js',
@@ -13,7 +14,7 @@ const STATIC_ASSETS = [
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
-  '/data/map.svg'
+  // map.svg no se pre-cachea — se carga bajo demanda si la campaña tiene mapa
 ];
 
 // Install — pre-cache static assets

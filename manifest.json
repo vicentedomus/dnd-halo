@@ -1,7 +1,7 @@
 {
-  "name": "HALO — Campaña D&D",
-  "short_name": "HALO",
-  "description": "Compendio interactivo de la campaña de Dungeons & Dragons",
+  "name": "Campaña D&D",
+  "short_name": "D&D",
+  "description": "Compendio interactivo de campaña de Dungeons & Dragons",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#131313",

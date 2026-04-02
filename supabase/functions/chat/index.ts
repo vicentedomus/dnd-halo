@@ -1,17 +1,13 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const ALLOWED_ORIGINS = [
-  "https://vicentedomus.github.io",
-  "http://localhost:3000",
-  "http://localhost:5500",
-  "http://127.0.0.1:3000",
-  "http://127.0.0.1:5500",
-];
+const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") || "http://localhost:5500,http://127.0.0.1:5500,http://localhost:3000,http://127.0.0.1:3000").split(",");
 
-const DM_PASSWORD = "halo-dm";
+const DM_PASSWORD = Deno.env.get("DM_PASSWORD") || "";
+const CAMPAIGN_NAME = Deno.env.get("CAMPAIGN_NAME") || "D&D";
+const DM_NAME = Deno.env.get("DM_NAME") || "DM";
 
-const SYSTEM_PROMPT = `Eres el **Asistente de Campaña** de la campaña de D&D 5e llamada **Halo**.
-Tu creador y DM es Vicente. Lo tratas de "tú". Respondes siempre en español.
+const SYSTEM_PROMPT = `Eres el **Asistente de Campaña** de la campaña de D&D 5e llamada **${CAMPAIGN_NAME}**.
+Tu creador y DM es ${DM_NAME}. Lo tratas de "tú". Respondes siempre en español.
 
 ---
 
@@ -39,7 +35,7 @@ Incluyen: party, últimas sesiones con contenido completo, quests con detalles, 
 
 # Modo Session Prep
 
-*Activa cuando Vicente quiera preparar la próxima sesión.*
+*Activa cuando el DM quiera preparar la próxima sesión.*
 
 ## Paso 1 — Confirmar contexto
 
@@ -104,7 +100,7 @@ Lo que la hace memorable. Algo que cambia el estado del mundo o de los personaje
 - Gancho 1: [algo sin resolver que tire al party hacia adelante]
 
 ## 📝 Notas privadas DM
-[Solo para Vicente: motivaciones ocultas, contingencias, secretos a largo plazo.]
+[Solo para el DM: motivaciones ocultas, contingencias, secretos a largo plazo.]
 - [NPC]: su verdadera motivación es [...]
 - Si el party hace [X]: contingencia es [...]
 
@@ -121,7 +117,7 @@ Lo que la hace memorable. Algo que cambia el estado del mundo o de los personaje
 
 # Modo Actualizar BDs post-sesión
 
-*Activa cuando Vicente quiera actualizar registros después de una sesión jugada.*
+*Activa cuando el DM quiera actualizar registros después de una sesión jugada.*
 
 ## Paso 1 — Identificar la sesión
 
@@ -202,10 +198,7 @@ Al final de tu respuesta, incluye un bloque de cambios ejecutables:
 ## Visibilidad
 - Ciudades: conocida_jugadores (boolean)
 - Todo lo demás: conocido_jugadores (boolean)
-- Soft delete: archived = true (no borrar, marcar)
-
-## Jugadores del party
-Tino, Caco, Leo, Enoch, Hiram`;
+- Soft delete: archived = true (no borrar, marcar)`;
 
 function corsHeaders(origin: string): Record<string, string> {
   const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];

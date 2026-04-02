@@ -1,10 +1,10 @@
 /* =============================================================
-   HALO — Asistente de Campaña (Chat IA)
+   Asistente de Campaña (Chat IA)
    planear.js — Chat UI con streaming, localStorage, botones rápidos
    Se abre dentro de util-workspace (pestaña Utilidades)
    ============================================================= */
 
-const CHAT_STORAGE_KEY = 'halo-chat-history';
+const CHAT_STORAGE_KEY = storageKey('chat_history');
 const CHAT_EDGE_FN = `${CONFIG.SUPABASE_URL}/functions/v1/chat`;
 
 let chatMessages = []; // [{role, content}]
@@ -458,7 +458,7 @@ async function sendMessage(text) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${CONFIG.SUPABASE_ANON_KEY}`,
-        'X-DM-Auth': 'halo-dm',
+        'X-DM-Auth': sessionStorage.getItem('dm_password') || '',
       },
       body: JSON.stringify({
         messages: chatMessages,

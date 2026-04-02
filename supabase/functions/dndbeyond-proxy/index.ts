@@ -1,12 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const ALLOWED_ORIGINS = [
-  "https://vicentedomus.github.io",
-  "http://localhost:3000",
-  "http://localhost:5500",
-  "http://127.0.0.1:3000",
-  "http://127.0.0.1:5500",
-];
+const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") || "http://localhost:5500,http://127.0.0.1:5500,http://localhost:3000,http://127.0.0.1:3000").split(",");
 
 const DDB_API = "https://character-service.dndbeyond.com/character/v5/character";
 

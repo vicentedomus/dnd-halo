@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HALO — Campaña D&D</title>
+  <title>Campaña D&amp;D</title>
   <!-- PWA -->
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#131313">
@@ -27,7 +27,7 @@
     <div class="nail ntl"></div><div class="nail ntr"></div>
     <div class="nail nbl"></div><div class="nail nbr"></div>
     <div class="parchment">
-      <div class="login-logo">HALO</div>
+      <div class="login-logo" id="login-logo"></div>
       <div class="login-subtitle">Campaña de Dungeons &amp; Dragons</div>
       <div class="login-divider"></div>
       <form id="login-form" autocomplete="off">
@@ -45,8 +45,8 @@
   <!-- SIDEBAR -->
   <aside id="sidebar">
     <div class="sidebar-brand">
-      <div class="sidebar-logo">HALO</div>
-      <div class="sidebar-subtitle">The Obsidian Archive</div>
+      <div class="sidebar-logo" id="sidebar-logo"></div>
+      <div class="sidebar-subtitle" id="sidebar-subtitle"></div>
     </div>
     <nav id="tab-bar">
       <button class="tab-btn active" data-tab="campana">
@@ -86,7 +86,7 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         Quests
       </button>
-      <button class="tab-btn" data-tab="mapa">
+      <button class="tab-btn map-only" data-tab="mapa">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/></svg>
         Mapa
       </button>
@@ -287,7 +287,18 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="campaign.js"></script>
 <script src="config.js"></script>
+<script>
+  // Inyectar nombre de campaña en UI estática
+  document.title = CONFIG.NAME + ' — Campaña D&D';
+  document.getElementById('login-logo').textContent = CONFIG.NAME;
+  document.getElementById('sidebar-logo').textContent = CONFIG.NAME;
+  document.getElementById('sidebar-subtitle').textContent = CONFIG.SUBTITLE;
+  // Ocultar tabs opcionales
+  if (!CONFIG.HAS_MAP) document.querySelectorAll('.map-only').forEach(el => el.style.display = 'none');
+  if (!CONFIG.HAS_AI) document.querySelectorAll('.ai-only').forEach(el => el.style.display = 'none');
+</script>
 <script src="supabase-client.js"></script>
 <script src="auth.js"></script>
 <script src="data/tiendas.js"></script>

@@ -1,5 +1,5 @@
 /* =============================================================
-   HALO — D&D Campaign Manager
+   D&D Campaign Manager
    app.js — Full application logic
    ============================================================= */
 
@@ -61,7 +61,7 @@ async function bootApp() {
 
 // ── GITHUB TOKEN ──────────────────────────────────────────
 function getGitHubToken() {
-  return localStorage.getItem('gh_token') || '';
+  return localStorage.getItem(storageKey('gh_token')) || '';
 }
 
 // ── DATA LOADING ──────────────────────────────────────────────
@@ -1138,7 +1138,7 @@ function initCampanaDrag() {
       }
       // Guardar orden
       campanaColOrder = [...container.querySelectorAll('.campana-col')].map(c => c.dataset.col);
-      try { localStorage.setItem('campana_col_order', JSON.stringify(campanaColOrder)); } catch {}
+      try { localStorage.setItem(storageKey('campana_col_order'), JSON.stringify(campanaColOrder)); } catch {}
     });
   });
 }
@@ -1146,7 +1146,7 @@ function initCampanaDrag() {
 // Restaurar orden de columnas desde localStorage
 function restoreCampanaColOrder() {
   try {
-    const saved = JSON.parse(localStorage.getItem('campana_col_order'));
+    const saved = JSON.parse(localStorage.getItem(storageKey('campana_col_order')));
     if (saved && Array.isArray(saved)) {
       campanaColOrder = saved;
       return;
@@ -1295,7 +1295,7 @@ const campanaFilters = {};
 function campanaInitVisibleCols() {
   if (campanaVisibleCols) return;
   try {
-    const saved = JSON.parse(localStorage.getItem('campana_visible_cols'));
+    const saved = JSON.parse(localStorage.getItem(storageKey('campana_visible_cols')));
     if (saved && Array.isArray(saved)) {
       campanaVisibleCols = new Set(saved);
       return;
@@ -1305,7 +1305,7 @@ function campanaInitVisibleCols() {
 }
 
 function campanaSaveVisibleCols() {
-  try { localStorage.setItem('campana_visible_cols', JSON.stringify([...campanaVisibleCols])); } catch {}
+  try { localStorage.setItem(storageKey('campana_visible_cols'), JSON.stringify([...campanaVisibleCols])); } catch {}
 }
 
 function campanaToggleCol(key) {
@@ -2032,7 +2032,7 @@ async function deleteRecord(section, entityId) {
     DATA[section] = arr.filter(r => r.id !== entityId);
     if (section === 'lugares' && MAP_MARKERS[entityId]) {
       delete MAP_MARKERS[entityId];
-      localStorage.setItem('map_markers', JSON.stringify(MAP_MARKERS));
+      localStorage.setItem(storageKey('map_markers'), JSON.stringify(MAP_MARKERS));
     }
     closeModal();
     renderAll();
@@ -2045,7 +2045,7 @@ async function deleteRecord(section, entityId) {
 
 async function saveMarkerPosition(entityId, x, y) {
   MAP_MARKERS[entityId] = { x, y };
-  localStorage.setItem('map_markers', JSON.stringify(MAP_MARKERS));
+  localStorage.setItem(storageKey('map_markers'), JSON.stringify(MAP_MARKERS));
   try { await sbUpsertMarker(entityId, x, y); } catch(e) { console.warn('Supabase marker sync failed:', e); }
 }
 
@@ -2310,7 +2310,7 @@ const FORM_SCHEMAS = {
   lugares: [
     { key:'nombre',  label:'Nombre', type:'text', required:true },
     { key:'tipo',    label:'Tipo',   type:'select', options:['','Pueblo','Aldea','Dungeon','Bosque','Ruinas','Fortaleza','Templo','Cueva','Puerto','Torre','Otro'] },
-    { key:'region',  label:'Regi\u00f3n', type:'select', options:['','Valora','Khunulba','Shimberia','Elarithva','Mythalos','Gnomalia','Khaz-Alun','Naiolonde','Mirnax','Bhiaxi','Genghis Clan','Krigh','Whitbury','Dustcairn','Selumanora','Shatrekvan'] },
+    { key:'region',  label:'Región', type:'text' },
     { key:'estado_exploracion', label:'Estado Exploraci\u00f3n', type:'select', options:['','Sin explorar','Parcialmente explorado','Explorado'] },
     { key:'descripcion', label:'Descripci\u00f3n', type:'textarea' },
     { key:'ciudad',  label:'Ciudad cercana', type:'select-rel', source:'ciudades' },
@@ -3310,13 +3310,14 @@ function renderMapMarkers() {
 
 // ── UTILIDADES ────────────────────────────────────────────────────
 
-const UTIL_CARDS = [
+const _ALL_UTIL_CARDS = [
   { id: 'shop-gen', title: 'Generador de Inventario', desc: 'Genera inventario aleatorio de tiendas mágicas según ciudad y tipo de establecimiento.', icon: '&#9876;' },
-  { id: 'campaign-ai', title: 'Asistente de Campaña', desc: 'Chat IA para preparar sesiones, generar NPCs, diseñar encuentros y consultar la campaña.', icon: '&#9876;' },
-  { id: 'session-prep', title: 'Preparador de Sesiones', desc: 'Prepara sesiones perfectas con los 8 pasos de Sly Flourish.', icon: '&#128220;' },
+  { id: 'campaign-ai', title: 'Asistente de Campaña', desc: 'Chat IA para preparar sesiones, generar NPCs, diseñar encuentros y consultar la campaña.', icon: '&#9876;', needsAI: true },
+  { id: 'session-prep', title: 'Preparador de Sesiones', desc: 'Prepara sesiones perfectas con los 8 pasos de Sly Flourish.', icon: '&#128220;', needsAI: true },
   { id: 'bestiario', title: 'Bestiario', desc: 'Repositorio completo de monstruos con stats, acciones y filtros avanzados.', icon: '&#128050;' },
   { id: 'catalogo-items', title: 'Catálogo Items', desc: 'Catálogo de ítems mágicos con rareza, propiedades y descripciones.', icon: '&#128218;' },
 ];
+const UTIL_CARDS = _ALL_UTIL_CARDS.filter(u => !u.needsAI || CONFIG.HAS_AI);
 
 function renderUtilidades() {
   const grid = document.getElementById('grid-utilidades');
@@ -3579,7 +3580,7 @@ async function recargarDatos() {
 // discovered = un explorador ha pasado por ahi (puede tener actividades)
 let FOG_DATA = {};
 let fogEnabled = true;
-const FOG_STORAGE_KEY = 'halo_fog_data';
+const FOG_STORAGE_KEY = storageKey('fog_data');
 
 function loadFogData() {
   try {
@@ -4122,7 +4123,7 @@ document.addEventListener('click', (e) => {
 
 // Regiones ya descubiertas (para no repetir banner)
 let discoveredRegions = new Set();
-const DISCOVERED_REGIONS_KEY = 'halo_discovered_regions';
+const DISCOVERED_REGIONS_KEY = storageKey('discovered_regions');
 
 function loadDiscoveredRegions() {
   try {
@@ -4321,7 +4322,7 @@ let partyTotalDays = 0;
 let partyWaypoints = []; // [{ q, r }] — waypoints del viaje planeado
 let partyPath = [];      // [{ q, r }] — path completo calculado (hex a hex)
 let partyDragging = false;
-const PARTY_STORAGE_KEY = 'halo_party';
+const PARTY_STORAGE_KEY = storageKey('party');
 
 function loadPartyData() {
   try {
