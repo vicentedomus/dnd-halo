@@ -3322,6 +3322,7 @@ function renderMapMarkers() {
 // ── UTILIDADES ────────────────────────────────────────────────────
 
 const _ALL_UTIL_CARDS = [
+  { id: 'manage-users', title: 'Administrar Jugadores', desc: 'Crear, editar y eliminar usuarios de la campaña. Resetear contraseñas.', icon: '&#128101;' },
   { id: 'shop-gen', title: 'Generador de Inventario', desc: 'Genera inventario aleatorio de tiendas mágicas según ciudad y tipo de establecimiento.', icon: '&#9876;' },
   { id: 'campaign-ai', title: 'Asistente de Campaña', desc: 'Chat IA para preparar sesiones, generar NPCs, diseñar encuentros y consultar la campaña.', icon: '&#9876;', needsAI: true },
   { id: 'session-prep', title: 'Preparador de Sesiones', desc: 'Prepara sesiones perfectas con los 8 pasos de Sly Flourish.', icon: '&#128220;', needsAI: true },
@@ -3346,11 +3347,140 @@ function renderUtilidades() {
 }
 
 function openUtilidad(id) {
+  if (id === 'manage-users') openManageUsers();
   if (id === 'shop-gen') openShopGenerator();
   if (id === 'campaign-ai') openAsistente();
   if (id === 'session-prep') openPreparador();
   if (id === 'bestiario') openBestiario();
   if (id === 'catalogo-items') openCatalogoItems();
+}
+
+// ── ADMIN DE USUARIOS ─────────────────────────────────────────────
+
+const MANAGE_USERS_URL = `${CONFIG.SUPABASE_URL}/functions/v1/manage-users`;
+
+async function manageUsersAPI(body) {
+  const session = await sbClient.auth.getSession();
+  const token = session.data.session?.access_token;
+  const res = await fetch(MANAGE_USERS_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
+async function openManageUsers() {
+  const ws = document.getElementById('util-workspace');
+  ws.style.display = '';
+  ws.innerHTML = `
+    <div class="util-panel">
+      <div class="util-panel-header">
+        <h3 class="util-title">&#128101; Administrar Jugadores</h3>
+        <button class="btn btn-sm" onclick="closeUtilWorkspace()">&#10005; Cerrar</button>
+      </div>
+      <div id="mu-list" style="padding:16px"><p style="color:var(--text-dim)">Cargando usuarios...</p></div>
+      <div style="padding:0 16px 16px">
+        <button class="btn btn-success" onclick="showAddUserForm()">+ Agregar usuario</button>
+      </div>
+      <div id="mu-add-form" style="display:none;padding:0 16px 16px"></div>
+    </div>
+  `;
+  await refreshUserList();
+}
+
+async function refreshUserList() {
+  const container = document.getElementById('mu-list');
+  const data = await manageUsersAPI({ action: 'list' });
+  if (data.error) {
+    container.innerHTML = `<p style="color:var(--red)">${data.error}</p>`;
+    return;
+  }
+  const users = data.users || [];
+  if (!users.length) {
+    container.innerHTML = '<p style="color:var(--text-dim)">No hay usuarios.</p>';
+    return;
+  }
+  container.innerHTML = `
+    <table class="data-table" style="width:100%">
+      <thead><tr>
+        <th>Usuario</th><th>Rol</th><th>Estado</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${users.map(u => `
+          <tr>
+            <td><strong>${u.username}</strong></td>
+            <td><span class="badge ${u.role === 'dm' ? 'badge-gold' : 'badge-dim'}">${u.role.toUpperCase()}</span></td>
+            <td>${u.mustChangePassword ? '<span style="color:var(--text-dim)">Pendiente</span>' : '<span style="color:var(--green)">Activo</span>'}</td>
+            <td style="text-align:right">
+              <button class="btn btn-sm" onclick="resetUserPassword('${u.id}','${u.username}')" title="Resetear contraseña">&#128274;</button>
+              ${u.role !== 'dm' ? `<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}','${u.username}')" title="Eliminar">&#128465;</button>` : ''}
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function showAddUserForm() {
+  const form = document.getElementById('mu-add-form');
+  form.style.display = '';
+  form.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+      <div class="util-field" style="flex:1;min-width:120px">
+        <label>Username</label>
+        <input type="text" id="mu-new-username" placeholder="nombre">
+      </div>
+      <div class="util-field" style="flex:1;min-width:120px">
+        <label>Contraseña temporal</label>
+        <input type="text" id="mu-new-password" value="halo2026">
+      </div>
+      <div class="util-field" style="min-width:100px">
+        <label>Rol</label>
+        <select id="mu-new-role">
+          <option value="player">Player</option>
+          <option value="dm">DM</option>
+        </select>
+      </div>
+      <button class="btn btn-success" onclick="addUser()">Crear</button>
+      <button class="btn btn-sm" onclick="document.getElementById('mu-add-form').style.display='none'">Cancelar</button>
+    </div>
+    <div id="mu-add-error" style="color:var(--red);font-size:.85rem;margin-top:4px"></div>
+  `;
+}
+
+async function addUser() {
+  const username = document.getElementById('mu-new-username').value.trim();
+  const password = document.getElementById('mu-new-password').value.trim();
+  const role = document.getElementById('mu-new-role').value;
+  const errEl = document.getElementById('mu-add-error');
+
+  if (!username || !password) { errEl.textContent = 'Username y contraseña son requeridos.'; return; }
+
+  errEl.textContent = 'Creando...';
+  const data = await manageUsersAPI({ action: 'create', username, password, role });
+  if (data.error) { errEl.textContent = data.error; return; }
+
+  document.getElementById('mu-add-form').style.display = 'none';
+  await refreshUserList();
+}
+
+async function resetUserPassword(userId, username) {
+  if (!confirm(`¿Resetear contraseña de ${username}? Se pondrá la temporal y deberá cambiarla al entrar.`)) return;
+  const data = await manageUsersAPI({ action: 'update', userId, resetPassword: true });
+  if (data.error) { alert(data.error); return; }
+  await refreshUserList();
+}
+
+async function deleteUser(userId, username) {
+  if (!confirm(`¿Eliminar a ${username}? Esta acción no se puede deshacer.`)) return;
+  const data = await manageUsersAPI({ action: 'delete', userId });
+  if (data.error) { alert(data.error); return; }
+  await refreshUserList();
 }
 
 function openShopGenerator() {
