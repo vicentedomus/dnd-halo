@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "Campaña Halo — D&amp;D Campaign Manager (OSRS Style)",
   "main": "app.js",
+  "type": "module",
   "scripts": {
+    "setup": "node setup/wizard.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

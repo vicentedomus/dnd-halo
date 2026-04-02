@@ -287,7 +287,28 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="campaign.js"></script>
+<script>
+  function showSetupRequired() {
+    document.getElementById('login-screen').innerHTML =
+      '<div class="frame-outer" style="max-width:500px;margin:auto;margin-top:15vh">' +
+        '<div class="nail ntl"></div><div class="nail ntr"></div>' +
+        '<div class="nail nbl"></div><div class="nail nbr"></div>' +
+        '<div class="parchment" style="text-align:center">' +
+          '<div class="login-logo">D&amp;D</div>' +
+          '<div class="login-subtitle">Campaign Manager</div>' +
+          '<div class="login-divider"></div>' +
+          '<p style="margin:1em 0;color:#d4c4a0">Esta campa\u00f1a a\u00fan no est\u00e1 configurada.</p>' +
+          '<p style="margin:1em 0;color:#d4c4a0;font-size:0.9em">' +
+            'Ejecuta en tu terminal:<br>' +
+            '<code style="background:rgba(255,255,255,0.1);padding:4px 12px;border-radius:4px;font-size:1.1em;color:#f0e6d0;display:inline-block;margin-top:8px">' +
+              'node setup/wizard.mjs' +
+            '</code>' +
+          '</p>' +
+        '</div>' +
+      '</div>';
+  }
+</script>
+<script src="campaign.js" onerror="showSetupRequired()"></script>
 <script src="config.js"></script>
 <script>
   // Inyectar nombre de campaña en UI estática

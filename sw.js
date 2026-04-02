@@ -6,8 +6,8 @@ const STATIC_ASSETS = [
   '/style.css',
   '/app.js',
   '/auth.js',
-  '/campaign.js',
   '/config.js',
+  // campaign.js no se pre-cachea — no existe hasta ejecutar el wizard
   '/supabase-client.js',
   '/planear.js',
   '/preparador.js',
