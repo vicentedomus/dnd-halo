@@ -894,6 +894,29 @@ async function openPlanView(planId) {
   }
 }
 
+// ── OPEN ENTITY DETAIL FROM PLANNER ──────────────────────────
+function openEntityDetail(nombre, bloqueKey) {
+  const n = (nombre || '').trim().toLowerCase();
+  if (!n) return;
+  if (bloqueKey === 'bloque_npcs' || bloqueKey === 'npcs') {
+    const npc = (DATA.npcs || []).find(x => (x.nombre || '').toLowerCase() === n);
+    if (npc) openDetail('npcs', npc);
+  } else if (bloqueKey === 'bloque_locaciones' || bloqueKey === 'locaciones') {
+    const lugar = (DATA.lugares || []).find(x => (x.nombre || '').toLowerCase() === n);
+    if (lugar) { openDetail('lugares', lugar); return; }
+    const ciudad = (DATA.ciudades || []).find(x => (x.nombre || '').toLowerCase() === n);
+    if (ciudad) { openDetail('ciudades', ciudad); return; }
+    const estab = (DATA.establecimientos || []).find(x => (x.nombre || '').toLowerCase() === n);
+    if (estab) openDetail('establecimientos', estab);
+  } else if (bloqueKey === 'bloque_tesoros' || bloqueKey === 'tesoros') {
+    const item = (DATA.items || []).find(x => (x.nombre || '').toLowerCase() === n);
+    if (item) openDetail('items', item);
+  } else if (bloqueKey === 'bloque_monstruos' || bloqueKey === 'monstruos') {
+    const m = (DATA.monstruos || []).find(x => (x.nombre || '').toLowerCase() === n);
+    if (m) openDetail('monstruos', m);
+  }
+}
+
 // ── RENDER PLAN VIEW ─────────────────────────────────────────
 function renderPlanView(plan) {
   const main = document.getElementById('preparador-main');
@@ -940,7 +963,7 @@ function renderPlanView(plan) {
   // Badge/botón por tarjeta individual
   function itemAction(bloqueKey, idx, nombre) {
     if (existsInDB(nombre, bloqueKey)) {
-      return '<span class="plan-indb-badge">✓ En BD</span>';
+      return `<span class="plan-indb-badge" style="cursor:pointer" onclick="event.stopPropagation();openEntityDetail('${(nombre||'').replace(/'/g,"\\'")}','${bloqueKey}')" title="Ver detalle">✓ En BD</span>`;
     }
     if (isItemCommitted(bloqueKey, idx)) {
       return '<span class="plan-committed-badge">✓ Committed</span>';
@@ -1065,7 +1088,7 @@ function renderPlanView(plan) {
     const cardClass = inDB || itemComm ? ' committed' : '';
     html += `<div class="npc-card${cardClass}">
       <div class="npc-card-top">
-        <div class="npc-nombre">${escapeHtml(n.nombre || '')}</div>
+        <div class="npc-nombre"${inDB ? ` style="cursor:pointer;text-decoration:underline dotted" onclick="openEntityDetail('${(n.nombre||'').replace(/'/g,"\\'")}','${npcsKey}')" title="Ver detalle"` : ''}>${escapeHtml(n.nombre || '')}</div>
         ${itemAction(npcsKey, idx, n.nombre)}
       </div>
       ${n.rol ? `<div class="npc-rol-badge">${escapeHtml(n.rol)}</div>` : ''}
@@ -1087,14 +1110,16 @@ function renderPlanView(plan) {
     const cardClass = inDB || itemComm ? ' committed' : '';
     html += `<div class="locacion-card${cardClass}">
       <div class="locacion-card-top">
-        <div class="locacion-nombre">${escapeHtml(l.nombre || '')}</div>
+        <div class="locacion-nombre"${inDB ? ` style="cursor:pointer;text-decoration:underline dotted" onclick="openEntityDetail('${(l.nombre||'').replace(/'/g,"\\'")}','${locKey}')" title="Ver detalle"` : ''}>${escapeHtml(l.nombre || '')}</div>
         ${itemAction(locKey, idx, l.nombre)}
       </div>
       <div class="locacion-tags">
         ${l.tipo ? `<span class="locacion-tag">${escapeHtml(l.tipo)}</span>` : ''}
         ${l.region ? `<span class="locacion-tag locacion-tag-region">${escapeHtml(l.region)}</span>` : ''}
       </div>
-      ${l.descripcion ? `<div class="locacion-desc">${escapeHtml(l.descripcion)}</div>` : ''}
+      ${l.descripcion_exterior ? `<div class="locacion-desc"><strong>Exterior:</strong> ${escapeHtml(l.descripcion_exterior)}</div>` : ''}
+      ${l.descripcion_interior ? `<div class="locacion-desc"><strong>Interior:</strong> ${escapeHtml(l.descripcion_interior)}</div>` : ''}
+      ${!l.descripcion_exterior && !l.descripcion_interior && l.descripcion ? `<div class="locacion-desc">${escapeHtml(l.descripcion)}</div>` : ''}
     </div>`;
   });
   html += `</div></div>`;
@@ -1115,7 +1140,7 @@ function renderPlanView(plan) {
     const cardClass = inDB || itemComm ? ' committed' : '';
     html += `<div class="tesoro-card${cardClass}">
       <div class="tesoro-top">
-        <div class="tesoro-nombre">${escapeHtml(t.nombre || '')}</div>
+        <div class="tesoro-nombre"${inDB ? ` style="cursor:pointer;text-decoration:underline dotted" onclick="openEntityDetail('${(t.nombre||'').replace(/'/g,"\\'")}','${tesorosKey}')" title="Ver detalle"` : ''}>${escapeHtml(t.nombre || '')}</div>
         ${rarezaBadge(t.rareza)}
         ${itemAction(tesorosKey, idx, t.nombre)}
       </div>
@@ -1260,6 +1285,8 @@ async function commitItem(planId, bloqueKey, index) {
       await sbSave('lugares', {
         nombre: item.nombre || item.name,
         tipo: item.tipo || '',
+        descripcion_exterior: item.descripcion_exterior || '',
+        descripcion_interior: item.descripcion_interior || '',
         descripcion: item.descripcion || item.description || '',
         region: item.region || '',
       }, 'add');

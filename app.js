@@ -444,7 +444,7 @@ const SEARCH_SOURCES = [
   { key: 'npcs',              tab: 'npcs',              label: 'NPC',             icon: '👤', fields: ['nombre','raza','primera_impresion'] },
   { key: 'ciudades',          tab: 'ciudades',          label: 'Ciudad',          icon: '🏙', fields: ['nombre','descripcion','lider'] },
   { key: 'establecimientos',  tab: 'establecimientos',  label: 'Establecimiento', icon: '🏪', fields: ['nombre','descripcion_interior','descripcion_exterior'] },
-  { key: 'lugares',           tab: 'lugares',           label: 'Lugar',           icon: '🗺', fields: ['nombre','descripcion'] },
+  { key: 'lugares',           tab: 'lugares',           label: 'Lugar',           icon: '🗺', fields: ['nombre','descripcion_interior','descripcion_exterior','descripcion'] },
   { key: 'items',             tab: 'items',             label: 'Item',            icon: '⚔', fields: ['nombre','descripcion'] },
   { key: 'quests',            tab: 'quests',            label: 'Quest',           icon: '★', fields: ['nombre','resumen'] },
   { key: 'players',           tab: 'personajes',        label: 'Personaje',       icon: '🎭', fields: ['nombre','descripcion'] },
@@ -904,7 +904,9 @@ function buildDetailHTML(section, data) {
         npcsL.length ? row('NPCs', npcsL.map(n => relChip('npcs', n.id, n.nombre)).join(' ')) : '',
         itemsL.length ? row('Items', itemsL.map(i => relChip('items', i.id, i.nombre)).join(' ')) : '',
         questsL.length ? row('Quests', questsL.map(q => relChip('quests', q.id, q.nombre)).join(' ')) : '',
-        textBlock('Descripci\u00f3n', l.descripcion),
+        textBlock('Exterior', l.descripcion_exterior),
+        textBlock('Interior', l.descripcion_interior),
+        !l.descripcion_exterior && !l.descripcion_interior ? textBlock('Descripci\u00f3n', l.descripcion) : '',
       ].join('');
     }
     case 'items': {
@@ -1821,7 +1823,7 @@ function renderLugares() {
       <div class="card-body">
         ${l.ciudad?.nombre ? `<div class="card-meta"><span class="meta-item"><span class="meta-label">Ciudad:</span> ${escapeHtml(l.ciudad.nombre)}</span></div>` : ''}
         ${l.estado_exploracion ? `<div class="card-meta"><span class="meta-item"><span class="meta-label">Exploraci\u00f3n:</span> ${escapeHtml(l.estado_exploracion)}</span></div>` : ''}
-        ${l.descripcion ? `<div class="card-desc">${escapeHtml(stripMentions(l.descripcion))}</div>` : ''}
+        ${l.descripcion_interior ? `<div class="card-desc">${escapeHtml(stripMentions(l.descripcion_interior))}</div>` : l.descripcion ? `<div class="card-desc">${escapeHtml(stripMentions(l.descripcion))}</div>` : ''}
       </div>
     </div>`).join('');
 }
@@ -2377,7 +2379,9 @@ const FORM_SCHEMAS = {
     { key:'tipo',    label:'Tipo',   type:'select', options:['','Pueblo','Aldea','Dungeon','Bosque','Ruinas','Fortaleza','Templo','Cueva','Puerto','Torre','Otro'] },
     { key:'region',  label:'Regi\u00f3n', type:'select', options:['','Valora','Khunulba','Shimberia','Elarithva','Mythalos','Gnomalia','Khaz-Alun','Naiolonde','Mirnax','Bhiaxi','Genghis Clan','Krigh','Whitbury','Dustcairn','Selumanora','Shatrekvan'] },
     { key:'estado_exploracion', label:'Estado Exploraci\u00f3n', type:'select', options:['','Sin explorar','Parcialmente explorado','Explorado'] },
-    { key:'descripcion', label:'Descripci\u00f3n', type:'textarea' },
+    { key:'descripcion_exterior', label:'Descripci\u00f3n Exterior', type:'textarea' },
+    { key:'descripcion_interior', label:'Descripci\u00f3n Interior', type:'textarea' },
+    { key:'descripcion', label:'Descripci\u00f3n (legacy)', type:'textarea' },
     { key:'ciudad',  label:'Ciudad cercana', type:'select-rel', source:'ciudades' },
     { key:'npcs',    label:'NPCs relacionados', type:'select-rel-multi', source:'npcs' },
     { key:'items_magicos', label:'Items relacionados', type:'select-rel-multi', source:'items' },
