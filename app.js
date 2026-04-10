@@ -112,6 +112,7 @@ function closeSidebar() {
 // ── TAB SWITCHING ───────────────────────────────────────────────
 const TAB_TITLES = { campana:'Campaña', notas:'Notas de Sesión', npcs:'NPCs', establecimientos:'Establecimientos', ciudades:'Ciudades', lugares:'Lugares', items:'Items Mágicos', personajes:'Personajes', quests:'Quests', mapa:'Mapa', utilidades:'Utilidades' };
 function switchTab(tab) {
+  if (tab === 'utilidades' && !isDM()) return;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === `section-${tab}`));
   const titleEl = document.getElementById('header-section-title');
@@ -3406,6 +3407,7 @@ function getUtilCards() {
 }
 
 function renderUtilidades() {
+  if (!isDM()) return;
   const grid = document.getElementById('grid-utilidades');
   if (!grid) return;
   grid.innerHTML = getUtilCards().map(u => `
